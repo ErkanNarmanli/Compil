@@ -77,7 +77,7 @@ and expr =
     | Eifelse   of expr * expr * expr
     | Ewhile    of expr * expr
     | Ereturn   of expr option
-    | Epritn    of expr
+    | Eprint    of expr
     | Ebloc     of bloc
 
 and bloc = instruction list
@@ -92,3 +92,4 @@ and binop = EqRef | NeRef | Eq | Ne | Lt | Le | Gt | Ge | Add | Sub | Mul | Div 
 and acces = 
     | Aident    of ident * ident
     | Aexpr     of expr * ident
+
