@@ -5,10 +5,10 @@ type fichier = {
     main        : classe_Main ; }
 
 and classe = {
-    c_name                : ident ;
+    c_name              : ident ;
     type_class_params   : (param_type_classe list) option ;
     params              : (parametre list) option ; (*paramètres*)
-    deriv               : typ * (expr list) ; (*héritage*)
+    deriv               : (typ * ((expr list) option)) option;(*héritage*)
     decls               : decl list ; }
 
 and decl =
@@ -24,11 +24,11 @@ and methode =
     | Mexpr  of meth_expr
 
 and meth_block = {
-    mb_name        : ident ;
-    mb_override    : bool ;
-    mb_type_params : (param_type list) option ;
-    mb_params      : parametre list ;
-    bloc        : bloc ; }
+    mb_name         : ident ;
+    mb_override     : bool ;
+    mb_type_params  : (param_type list) option ;
+    mb_params       : parametre list ;
+    bloc            : bloc ; }
 
 and meth_expr = {
     me_name        : ident ;
@@ -39,7 +39,7 @@ and meth_expr = {
     res_expr    : expr; }
 
 and parametre = {
-    p_name        : ident ;
+    p_name      : ident ;
     typ         : typ   ; }
 
 and param_type = 
@@ -92,3 +92,4 @@ and binop = EqRef | NeRef | Eq | Ne | Lt | Le | Gt | Ge | Add | Sub | Mul | Div 
 and acces = 
     | Aident    of ident * ident
     | Aexpr     of expr * ident
+
