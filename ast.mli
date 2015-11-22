@@ -77,7 +77,7 @@ and expr =
     | Eifelse   of expr * expr * expr
     | Ewhile    of expr * expr
     | Ereturn   of expr option
-    | Epritn    of expr
+    | Eprint    of expr
     | Ebloc     of bloc
 
 and bloc = instruction list
