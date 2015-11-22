@@ -10,17 +10,17 @@ let print_list func deb sep fin xs =
 
 let print_o func = function
     | None      -> ()
-    | Some x    -> func xs
+    | Some x    -> func x
 
 let print_list_o func deb sep fin = print_o (print_list func deb sep fin)
 
-let print_fichier fich =
-    print_list "" "\n" "" fich.classes ;
-    print_main fich.main
+let rec print_fichier fich =
+    print_list print_classe "" "\n" "" fich.classes ;
+    print_classe_Main fich.main
 
 and print_classe cl = 
     print_string "class " ;
-    print_indent cl.c_name ;
+    print_ident cl.c_name ;
     print_list_o print_param_type_classe "\n\t[" ", " "]" cl.type_class_params ;
     print_list_o print_parametre "\n\t(" ", " ")" cl.params ;
     begin match cl.deriv with
@@ -95,7 +95,7 @@ and print_param_type = function
                            end
                            
 
-and print param_type_classe = function
+and print_param_type_classe = function
     | PTCplus p     -> print_string "+";
                        print_param_type p
     | PTCmoins p    -> print_string "-";
@@ -109,7 +109,7 @@ and print_arguments_type = print_list_o print_typ "[" "," "]"
 
 and print_classe_Main = print_list print_decl "object Main {" ";\n" "}\n"
 
-and rec print_expr = function
+and print_expr = function
     | Evoid             -> print_string "()"
     | Ethis             -> print_string "this"
     | Enull             -> print_string "null"

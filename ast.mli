@@ -8,7 +8,7 @@ and classe = {
     c_name              : ident ;
     type_class_params   : (param_type_classe list) option ;
     params              : (parametre list) option ; (*paramètres*)
-    deriv               : (typ * ((expr list) option)) option;(*héritage*)
+    deriv               : (typ * expr list option) option;(*héritage*)
     decls               : decl list ; }
 
 and decl =
