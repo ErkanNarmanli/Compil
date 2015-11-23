@@ -25,6 +25,10 @@ $(BIN): $(CMO)
 parser.ml: ast.cmi
 
 clean:
-	rm *.cmi *.cmx *.cmo
+	rm *.cmi *.cmo
 	rm ppast
+	rm $(GENERATED) 
 
+.depend depend : $(GENERATED)
+	rm -f .depend
+	ocamldep *.ml *.mli *.

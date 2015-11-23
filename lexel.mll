@@ -35,5 +35,5 @@ and short_comment = parse
 and long_comment = parse
     | '\n'              { newline lexbuf; long_comment lexbuf }
     | "*/"              { token lexbuf }
-    | eof               { EOF }
+    | eof               { raise Lexing_error "Commentaire non terminé" }
     | _                 { long_comment lexbuf }
