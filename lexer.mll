@@ -14,12 +14,6 @@
             pos_bol = pos.pos_cnum
         }
 
-}
-    
-    let digit = ['0' - '9']
-    let alpha = ['a' - 'z'] | ['A' - 'Z']
-    let ident = alpha (alpha | digit | '_')
-
     let keywords = [
         "class",        CLASS;
         "def",          DEF;
@@ -41,6 +35,13 @@
         "var",          VAR;
         "while",        WHILE
     ]
+
+
+}
+    
+    let digit = ['0' - '9']
+    let alpha = ['a' - 'z'] | ['A' - 'Z']
+    let ident = alpha (alpha | digit | '_')
 
 
 rule token = parse
