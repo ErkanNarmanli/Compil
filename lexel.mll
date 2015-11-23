@@ -25,7 +25,7 @@ rule token = parse
     | '\n'              { newline lexbuf; token lexbuf }
     | "//"              { short_comment lexbuf }
     | "/*"              { long_comment lexbuf }
-    | 
+    | _                 { assert false "TODO1" } 
 
 and short_comment = parse
     | '\n'              { newline lexbuf; token lexbuf }
