@@ -1,9 +1,9 @@
-CMO=ppast.cmo lexer.cmo parser.cmo
+CMO=ppast.cmo lexer.cmo parser.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli
-BIN=ppast
+BIN=main
 
 make: $(BIN)
-	./$(BIN) 
+	for f in *.scala; do ./$(BIN) $$f; done 
 
 $(BIN): $(CMO)
 	ocamlc -o $(BIN) $(CMO)
@@ -27,7 +27,7 @@ ppast.ml: ast.cmi
 
 clean:
 	rm *.cmi *.cmo
-	rm ppast
+	rm main
 	rm $(GENERATED)
 
 .depend depend: $(GENERATED)

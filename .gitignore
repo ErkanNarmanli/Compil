@@ -29,4 +29,5 @@ pscala
 *parser.ml
 *parser.mli
 ppast
-
+main
+*.scala
