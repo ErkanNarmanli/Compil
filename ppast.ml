@@ -80,20 +80,17 @@ and print_meth_expr me =
 
 and print_parametre p = 
     print_ident p.p_name ;
-    print_typ p.typ
+    print_typ p.p_typ
 
-and print_param_type = function
-    | PTinf (i, typo)   -> print_string i;
-                           begin match typo with
-                               | None   -> ()
-                               | Some t -> print_string " >: "; print_typ t
-                           end
-    | PTsup (i, typo)   -> print_string i;
-                           begin match typo with
-                               | None   -> ()
-                               | Some t -> print_string " <: "; print_typ t
-                           end
-                           
+and print_smile = function
+    | Hinf t    -> print_string " >: "; print_typ t
+    | Hsup t    -> print_string " <: "; print_typ t
+
+and print_param_type (id, ho) = 
+    print_string id;
+    match ho with
+        | None          -> ()
+        | Some smile    -> print_smile smile
 
 and print_param_type_classe = function
     | PTCplus p     -> print_string "+";

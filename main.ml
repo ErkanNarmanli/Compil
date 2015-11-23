@@ -52,20 +52,19 @@ let () =
        n'est détectée.
        La fonction Lexer.token est utilisée par Parser.prog pour obtenir
        le prochain token. *)
-    let p = Parser.prog Lexer.token buf in
+    let p = Parser.fichier Lexer.token buf in
     close_in f;
-    Ppast.print_expr p;
+    Ppast.print p;
 (*
     (* On s'arrête ici si on ne veut faire que le parsing *)
     if !parse_only then exit 0;
 
     Interp.prog p*)
   with
-    | Lexer.Lexing_error (c,pos) ->
+    | Lexer.Lexing_error c ->
 	(* Erreur lexicale. On récupère sa position absolue et
 	   on la convertit en numéro de ligne *)
 	localisation (Lexing.lexeme_start_p buf);
-    localisation pos;
     eprintf "Erreur lexicale: %s@." c;
 	exit 1
     | Parser.Error ->
