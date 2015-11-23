@@ -15,13 +15,14 @@
 /* Priorités et associativité des tokens */
 
 /* Points d'entrée de la grammaire */
+%start prog
 
 /* Types des valeurs renvoyées par l'analyseur syntaxique */
-
+%type <Ast.expr> prog
 
 %%
 
 prog:
-    i = INT     { Eint i}
+    i = INT; EOF     { Eint i}
 ;
 

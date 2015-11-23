@@ -2,7 +2,7 @@ CMO=ppast.cmo lexer.cmo parser.cmo
 GENERATED=lexer.ml parser.ml parser.mli
 BIN=ppast
 
-all: $(BIN)
+make: $(BIN)
 	./$(BIN) 
 
 $(BIN): $(CMO)

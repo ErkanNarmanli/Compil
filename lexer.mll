@@ -13,7 +13,7 @@
             pos with pos_lnum = pos.pos_lnum + 1;
             pos_bol = pos.pos_cnum
         }
-
+(*
     let keywords = [
         "class",        CLASS;
         "def",          DEF;
@@ -41,7 +41,7 @@
             List.assoc s keywords
         with
         | Not_found _ -> IDENT s  
-
+*)
 }
     
     let digit = ['0' - '9']
@@ -54,17 +54,17 @@ rule token = parse
     | '\n'              { newline lexbuf; token lexbuf }
     | "//"              { short_comment lexbuf }
     | "/*"              { long_comment lexbuf }
-    | digit as i        { INT (int_of_string i) }
-    | ident as s        { check_kw s } 
+    | digit+ as i       { INT (int_of_string i) }
+ (*   | ident as s        { check_kw s }*) 
     | _                 { assert false } 
 
 and short_comment = parse
     | '\n'              { newline lexbuf; token lexbuf }
     | eof               { EOF }
-    | _                 { short_comment }
+    | _                 { short_comment lexbuf }
 
 and long_comment = parse
     | '\n'              { newline lexbuf; long_comment lexbuf }
     | "*/"              { token lexbuf }
-    | eof               { raise Lexing_error "Commentaire non terminé" }
+    | eof               { raise (Lexing_error ("Commentaire non terminé", lexbuf.lex_curr_p)) }
     | _                 { long_comment lexbuf }
