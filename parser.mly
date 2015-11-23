@@ -8,6 +8,8 @@
 /* Déclaration des tokens */
 
 %token EOF
+%token <int> INT
+%token <string> STRING
 
 /* Priorités et associativité des tokens */
 
