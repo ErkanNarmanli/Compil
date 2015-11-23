@@ -13,17 +13,17 @@
             pos with pos_lnum = pos.pos_lnum + 1;
             pos_bol = pos.pos_cnum
         }
-(*
+
     let keywords = [
         "class",        CLASS;
         "def",          DEF;
         "else",         ELSE;
-        "eq",           EQ;
+        "eq",           EQREF;
         "extends",      EXTENDS;
         "false",        FALSE;
         "if",           IF;
-        "ne",           NE;
-        "new",          NEW
+        "ne",           NEREF;
+        "new",          NEW;
         "null",         NULL;
         "object",       OBJECT;
         "override",     OVERRIDE;
@@ -41,7 +41,7 @@
             List.assoc s keywords
         with
         | Not_found _ -> IDENT s  
-*)
+
 }
     
     let digit = ['0' - '9']
@@ -55,7 +55,7 @@ rule token = parse
     | "//"              { short_comment lexbuf }
     | "/*"              { long_comment lexbuf }
     | digit+ as i       { INT (int_of_string i) }
- (*   | ident as s        { check_kw s }*) 
+    | ident as s        { check_kw s }
     | eof               { EOF }
     | _                 { assert false } 
 
