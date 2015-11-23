@@ -1,8 +1,8 @@
-CMO=ppast.cmo lexer.cmo parser.cmo
+CMO=ppast.cmo lexer.cmo parser.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli
-BIN=ppast
+BIN=main
 
-all: $(BIN)
+make: $(BIN)
 	./$(BIN) 
 
 $(BIN): $(CMO)
@@ -27,7 +27,7 @@ ppast.ml: ast.cmi
 
 clean:
 	rm *.cmi *.cmo
-	rm ppast
+	rm main
 	rm $(GENERATED)
 
 .depend depend: $(GENERATED)
