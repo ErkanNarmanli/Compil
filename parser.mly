@@ -15,14 +15,14 @@
 /* Priorités et associativité des tokens */
 
 /* Points d'entrée de la grammaire */
-%start prog
+%start fichier
 
 /* Types des valeurs renvoyées par l'analyseur syntaxique */
-%type <Ast.expr> prog
+%type <Ast.fichier> fichier
 
 %%
 
-prog:
+fichier:
     i = INT; EOF     { Eint i}
 ;
 
