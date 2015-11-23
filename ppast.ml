@@ -25,7 +25,7 @@ and print_classe cl =
     print_list_o print_parametre "\n\t(" ", " ")" cl.params ;
     begin match cl.deriv with
         | None      -> ()
-        | Some (a,b)->  print "\n\textends" ;
+        | Some (a,b)->  print_string "\n\textends" ;
                         print_typ a ;
                         print_list_o print_expr " (" ", " ")" b 
     end ;
@@ -33,7 +33,7 @@ and print_classe cl =
 
  and print_decl = function
     | Dvar v   -> print_var v
-    | Dmeth m  -> print_mehtode m
+    | Dmeth m  -> print_methode m
 
 and print_var = function
     | Val (i, o_t, e)   ->  print_string "val " ;
@@ -60,7 +60,7 @@ and print_methode = function
     | Mexpr me  -> print_meth_expr me
 
 and print_meth_bloc mb =
-    if mb.override then print_string "override " ;
+    if mb.mb_override then print_string "override " ;
     print_string "def " ;
     print_ident mb.mb_name ;
     print_list_o print_param_type " [" ", " "]" mb.mb_type_params ;
@@ -68,7 +68,7 @@ and print_meth_bloc mb =
     print_bloc mb.bloc
     
 and print_meth_expr me =
-    if me.override then print_string "override " ;
+    if me.me_override then print_string "override " ;
     print_string "def " ;
     print_ident me.me_name ;
     print_list_o print_param_type " [" ", " "]" me.me_type_params ;
@@ -103,11 +103,11 @@ and print_param_type_classe = function
     | PTCrien p     -> print_param_type p
 
 and print_typ typ = Printf.printf "%s " typ.t_name;
-                    print_arguments_type
+                    print_arguments_type typ.args_type
 
-and print_arguments_type = print_list_o print_typ "[" "," "]"
+and print_arguments_type argts = print_list_o print_typ "[" "," "]" argts
 
-and print_classe_Main = print_list print_decl "object Main {" ";\n" "}\n"
+and print_classe_Main cm = print_list print_decl "object Main {" ";\n" "}\n" cm
 
 and print_expr = function
     | Evoid             -> print_string "()"
@@ -124,9 +124,9 @@ and print_expr = function
                                     print_char ' ';
                                     print_arguments_type argt;
                                     print_list print_expr "(" ", " ")" es
-    | Enew (id, argt, es) -> Printf.printf "new %s ";
+    | Enew (id, argt, es) -> Printf.printf "new %s " id;
                              print_arguments_type argt;
-                             print_string print_list print_expr " (" ", " ")" es
+                             print_list print_expr " (" ", " ")" es
     | Eneg e            -> print_string "! "; print_expr e
     | Emoins e          -> print_string "-"; print_expr e
     | Ebinop (b, e1, e2)-> print_expr e1;
@@ -139,7 +139,7 @@ and print_expr = function
                            print_string ") then\n";
                            print_string "\t";
                            print_expr e2
-    | Eielse (e1, e2, e3) -> print_string "if (";
+    | Eifelse (e1, e2, e3) -> print_string "if (";
                              print_expr e1;
                              print_string ") then\n";
                              print_string "\t";
@@ -158,7 +158,7 @@ and print_expr = function
                            print_string ")"
     | Ebloc b           -> print_bloc b
 
-and print_bloc = print_list print_instruction "{" ";\n" "}"
+and print_bloc b = print_list print_instruction "{" ";\n" "}" b
 
 and print_instruction = function
     | Ivar v    -> print_var v
@@ -173,14 +173,13 @@ and print_binop = function
     | Le        -> print_string "Le"
     | Gt        -> print_string "Gt"
     | Ge        -> print_string "Ge"
-    | Gt        -> print_string "Gt"
     | Add       -> print_string "+"
     | Sub       -> print_string "-"
     | Mul       -> print_string "*"
     | Div       -> print_string "/"
     | Mod       -> print_string "%"
     | And       -> print_string "&&"
-    | Or        -> print_strinh "||"
+    | Or        -> print_string "||"
 
 and print_acces = function
     | Aident(i1, i2)    -> print_string i1; print_char '.'; print_string i2
