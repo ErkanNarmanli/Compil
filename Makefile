@@ -1,4 +1,4 @@
-CMO=lexer.cmo parser.cmo ppast.cmo
+CMO=ppast.cmo lexer.cmo parser.cmo
 GENERATED=lexer.ml parser.ml parser.mli
 BIN=ppast
 
@@ -8,7 +8,7 @@ all: $(BIN)
 $(BIN): $(CMO)
 	ocamlc -o $(BIN) $(CMO)
 
-#.SUFFIXES: .mli .ml .cmi .cmo .mll .mly
+.SUFFIXES: .mli .ml .cmi .cmo .mll .mly
 
 %.cmi: %.mli
 	ocamlc -c $<
@@ -23,8 +23,18 @@ $(BIN): $(CMO)
 	menhir --infer -v $<
 
 parser.ml: ast.cmi
+ppast.ml: ast.cmi
 
 clean:
-	rm *.cmi *.cmx *.cmo
+	rm *.cmi *.cmo
 	rm ppast
+	rm $(GENERATED)
+
+.depend depend: $(GENERATED)
+	rm -f .depend
+	ocamldep *.ml *.mli  > .depend
+
+include .depend
+
+
 
