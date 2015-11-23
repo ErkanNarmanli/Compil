@@ -10,6 +10,7 @@
 %token EOF
 %token <int> INT
 %token <string> STRING
+%token <string> IDENT
 
 /* Priorités et associativité des tokens */
 
