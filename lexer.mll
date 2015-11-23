@@ -49,6 +49,7 @@ rule token = parse
     | '\n'              { newline lexbuf; token lexbuf }
     | "//"              { short_comment lexbuf }
     | "/*"              { long_comment lexbuf }
+    | digit as i        { INT (int_of_string i) }
     | _                 { assert false "TODO1" } 
 
 and short_comment = parse

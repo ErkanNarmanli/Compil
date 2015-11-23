@@ -20,7 +20,7 @@
 
 %%
 
-fichier:
-    classes = classe*; main = classe_Main; EOF
-        {classes = classes; main = main}
+prog:
+    i = INT     { Eint i}
 ;
+
