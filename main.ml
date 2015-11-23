@@ -5,7 +5,7 @@ open Format
 open Lexing
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
-let parse_only = ref false
+let parse_only = ref true
 
 (* Noms des fichiers source et cible *)
 let ifile = ref ""
@@ -54,17 +54,19 @@ let () =
        le prochain token. *)
     let p = Parser.prog Lexer.token buf in
     close_in f;
+    Ppast.print_expr p;
 (*
     (* On s'arrête ici si on ne veut faire que le parsing *)
     if !parse_only then exit 0;
 
     Interp.prog p*)
   with
-    | Lexer.Lexing_error c ->
+    | Lexer.Lexing_error (c,pos) ->
 	(* Erreur lexicale. On récupère sa position absolue et
 	   on la convertit en numéro de ligne *)
 	localisation (Lexing.lexeme_start_p buf);
-	eprintf "Erreur lexicale: %s@." c;
+    localisation pos;
+    eprintf "Erreur lexicale: %s@." c;
 	exit 1
     | Parser.Error ->
 	(* Erreur syntaxique. On récupère sa position absolue et on la

@@ -51,11 +51,12 @@
 
 rule token = parse
     | [' ' '\t']+       { token lexbuf }
-    | '\n'              { newline lexbuf; token lexbuf }
+    | ['\n' '\r']+      { newline lexbuf; token lexbuf }
     | "//"              { short_comment lexbuf }
     | "/*"              { long_comment lexbuf }
     | digit+ as i       { INT (int_of_string i) }
  (*   | ident as s        { check_kw s }*) 
+    | eof               { EOF }
     | _                 { assert false } 
 
 and short_comment = parse
@@ -68,3 +69,4 @@ and long_comment = parse
     | "*/"              { token lexbuf }
     | eof               { raise (Lexing_error ("Commentaire non terminé", lexbuf.lex_curr_p)) }
     | _                 { long_comment lexbuf }
+

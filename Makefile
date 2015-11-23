@@ -3,7 +3,7 @@ GENERATED=lexer.ml parser.ml parser.mli
 BIN=main
 
 make: $(BIN)
-	./$(BIN) 
+	for f in *.scala; do ./$(BIN) $$f; done 
 
 $(BIN): $(CMO)
 	ocamlc -o $(BIN) $(CMO)

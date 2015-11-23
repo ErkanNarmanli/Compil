@@ -185,3 +185,4 @@ and print_acces = function
     | Aident(i1, i2)    -> print_string i1; print_char '.'; print_string i2
     | Aexpr(e, i)       -> print_expr e; print_char '.'; print_string i
 
+let print f = print_fichier f; print_endline ""
