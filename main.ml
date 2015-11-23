@@ -47,19 +47,19 @@ let () =
   let buf = Lexing.from_channel f in
 
   try
-    (* Parsing: la fonction  Parser.prog transforme le tampon lexical en un
+    (* Parsing: la fonction  Parser.fichier transforme le tampon lexical en un
        arbre de syntaxe abstraite si aucune erreur (lexicale ou syntaxique)
        n'est détectée.
-       La fonction Lexer.token est utilisée par Parser.prog pour obtenir
+       La fonction Lexer.token est utilisée par Parser.fichier pour obtenir
        le prochain token. *)
-    let p = Parser.prog Lexer.token buf in
+    let p = Parser.fichier Lexer.token buf in
     close_in f;
-    Ppast.print_expr p;
+    Ppast.print p;
 (*
     (* On s'arrête ici si on ne veut faire que le parsing *)
     if !parse_only then exit 0;
 
-    Interp.prog p*)
+    Interp.fichier p*)
   with
     | Lexer.Lexing_error (c,pos) ->
 	(* Erreur lexicale. On récupère sa position absolue et
