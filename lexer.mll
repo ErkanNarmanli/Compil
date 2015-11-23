@@ -35,7 +35,12 @@
         "var",          VAR;
         "while",        WHILE
     ]
-
+    
+    let check_kw s = 
+        try
+            List.assoc s keywords
+        with
+        | Not_found _ -> IDENT s  
 
 }
     
@@ -50,7 +55,8 @@ rule token = parse
     | "//"              { short_comment lexbuf }
     | "/*"              { long_comment lexbuf }
     | digit as i        { INT (int_of_string i) }
-    | _                 { assert false "TODO1" } 
+    | ident as s        { check_kw s } 
+    | _                 { assert false } 
 
 and short_comment = parse
     | '\n'              { newline lexbuf; token lexbuf }
