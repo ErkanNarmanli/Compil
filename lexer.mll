@@ -4,7 +4,7 @@
     open Parser
 
     (* Exception signalant une erreur lexicale *)
-    exception Lexing_error of string * position
+    exception Lexing_error of string
 
     (* retour à la ligne *)
     let newline lexbuf =
@@ -66,5 +66,5 @@ and short_comment = parse
 and long_comment = parse
     | '\n'              { newline lexbuf; long_comment lexbuf }
     | "*/"              { token lexbuf }
-    | eof               { raise (Lexing_error ("Commentaire non terminé", lexbuf.lex_curr_p)) }
+    | eof               { raise (Lexing_error "Commentaire non terminé") }
     | _                 { long_comment lexbuf }
