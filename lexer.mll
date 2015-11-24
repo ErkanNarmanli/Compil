@@ -46,6 +46,7 @@
         ">:",           INF ;
         "<:",           SUP ;
         "==",           EQ ;
+        "=",            EQUAL;
         "!=",           NE ;
         "<=",           LE ;
         ">=",           GE ;
@@ -53,6 +54,7 @@
         ">",            GT ;
         "&&",           AND ;
         "||",           OR;
+        ",",            COMMA;
         ":",            CONS
     ]
     
@@ -98,11 +100,11 @@ rule token = parse
     | ['\n' '\r']           { newline lexbuf; token lexbuf }
     | "//"                  { short_comment lexbuf }
     | "/*"                  { long_comment lexbuf }
-    | limits as d           { check_del d }
-    | digit+ as i           { INT (int_of_string i) }
     | symbol+ as w          { check_op w }
+    | digit+ as i           { INT (int_of_string i) }
     | ident as s            { check_kw s }
     | '"' (car* as s) '"'   { STRING s } 
+    | limits as d           { check_del d }
     | eof                   { EOF }
     | _                     { assert false } 
 
