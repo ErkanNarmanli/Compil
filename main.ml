@@ -5,7 +5,7 @@ open Format
 open Lexing
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
-let parse_only = ref true
+let parse_only = ref false
 
 (* Noms des fichiers source et cible *)
 let ifile = ref ""
@@ -77,3 +77,4 @@ let () =
 	(* Erreur pendant l'interprétation *)
 	eprintf "Erreur : %s@." s;
 	exit 1*)
+
