@@ -36,6 +36,7 @@
         "while",        WHILE;
         "Main",         MAIN
     ]
+
     let operators = [
         "+",            ADD ;
         "-",            SUB ;
@@ -51,51 +52,69 @@
         "<",            LT ;
         ">",            GT ;
         "&&",           AND ;
-        "||",           OR 
+        "||",           OR;
+        ":",            CONS
     ]
     
+    let delimitors = [
+        '(',            LPAR;
+        ')',            RPAR;
+        '[',            LCRO;
+        ']',            RCRO;
+        '{',            LACC;
+        '}',            RACC
+    ]
+
     let check_kw s = 
         try
             List.assoc s keywords
         with
-        | Not_found _ -> IDENT s  
+        | Not_found -> IDENT s  
+        | e         -> raise e
 
     let check_op w =
         try
             List.assoc w operators
         with
-        | Not_found _ -> raise (Lexing_error "Opérateur inconnu")
+        | Not_found -> raise (Lexing_error "Opérateur inconnu")
 
+    let check_del d = 
+        try
+            List.assoc d delimitors
+        with 
+        | _ ->  assert false
 }
     
     let digit   = ['0' - '9']
-    let symbol  = [' ' '!' '#' '$' '%' '&' ''' '(' ')' '*' '+' ',' '-' '.''/' ':' ';' '<' '>' '=' '?' '@' '[' ']' '^' '_' '`' '{' '}' '|' '~' '\"' '\n' '\r' '\\' ]
+    let symbol  = ['!' '#' '$' '%' '&' ''' '*' '+' ',' '-' '.' '/' ':' ';' '<' '>' '=' '?' '@' '^' '_' '`' '|' '~' '"' '\\' ]
+    let limits  = ['(' ')' '[' ']' '{' '}']
     let alpha   = ['a' - 'z'] | ['A' - 'Z']
-    let car     = digit | symbol | alpha 
-    let ident   = alpha (alpha | digit | '_')
+    let car     = digit | symbol | alpha | limits | ' ' | '\n'
+    let ident   = alpha (alpha | digit | '_') *
 
 
 rule token = parse
-    | [' ' '\t']+       { token lexbuf }
-    | ['\n' '\r']+      { newline lexbuf; token lexbuf }
-    | "//"              { short_comment lexbuf }
-    | "/*"              { long_comment lexbuf }
-    | digit+ as i       { INT (int_of_string i) }
-    | symbol+ as w      { check_op w }
-    | ident as s        { check_kw s }
-    | '"' (car* as s) '"' { STRING s } 
-    | eof               { EOF }
-    | _                 { assert false } 
+    | [' ' '\t']+           { token lexbuf }
+    | ['\n' '\r']           { newline lexbuf; token lexbuf }
+    | "//"                  { short_comment lexbuf }
+    | "/*"                  { long_comment lexbuf }
+    | limits as d           { check_del d }
+    | digit+ as i           { INT (int_of_string i) }
+    | symbol+ as w          { check_op w }
+    | ident as s            { check_kw s }
+    | '"' (car* as s) '"'   { STRING s } 
+    | eof                   { EOF }
+    | _                     { assert false } 
 
 
 and short_comment = parse
-    | '\n'              { newline lexbuf; token lexbuf }
-    | eof               { EOF }
-    | _                 { short_comment lexbuf }
+    | '\n'                  { newline lexbuf; token lexbuf }
+    | eof                   { EOF }
+    | _                     { short_comment lexbuf }
 
 and long_comment = parse
-    | '\n'              { newline lexbuf; long_comment lexbuf }
-    | "*/"              { token lexbuf }
-    | eof               { raise (Lexing_error "Commentaire non terminé") }
-    | _                 { long_comment lexbuf }
+    | '\n'                  { newline lexbuf; long_comment lexbuf }
+    | "*/"                  { token lexbuf }
+    | eof                   { raise (Lexing_error "Commentaire non terminé") }
+    | _                     { long_comment lexbuf }
 

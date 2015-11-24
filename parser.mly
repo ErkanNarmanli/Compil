@@ -21,12 +21,11 @@
 %token EQ NE LT LE GT GE AND OR
 
 %token CLASS DEF ELSE EQREF EXTENDS FALSE IF NEREF NEW NULL OBJECT
-    OVERRIDE PRINT RETURN THIS TRUE VAL VAR WHILE
+%token OVERRIDE PRINT RETURN THIS TRUE VAL VAR WHILE
 %token MAIN EOF
 %token LPAR RPAR LACC RACC LCRO RCRO CONS EQUAL COMMA NOT DOT SEMICOLON
 
 (* Priorités et associativité des tokens *)
-%right COMA SEMICOLON
 %nonassoc IF
 %nonassoc WHILE RETURN
 %right EQUAL
@@ -56,31 +55,37 @@
 constyp:
     CONS; t = typ
         { t }
+;
 
 (* [ <type>+, ] *)
 typ_l:
     LCRO; ts = separated_nonempty_list(COMMA, typ) ; RCRO
         { ts }
+;
 
 (* [ <param_type_classe>*, ] *)
 param_type_classe_l:
     LCRO; ptcs = separated_nonempty_list(COMMA, param_type_classe); RCRO
         { ptcs }
+;
 
 (* [ <param_type>+, ] *)
 param_type_l:
     LCRO; pars = separated_nonempty_list(COMMA, param_type); RCRO
         { pars }
+;
 
 (* ( <parametres>*, ) *)
 param_l:
     LPAR; params = separated_list(COMMA, parametre); RPAR
         { params }
+;
 
 (* ( <expr>*, ) *)
 expr_l:
     LPAR; exprs = separated_list(COMMA, expr); RPAR
         { exprs }
+;
 
 (* extends <type> ( <expr>*, )?
  * utile dans la définition des classes
@@ -88,11 +93,13 @@ expr_l:
 heritage:
     EXTENDS; t = typ; expr_lo = expr_l?
         { (t, expr_lo) }
+;
 
 (* var | expr *) 
 instruction:
     | v = var       { Ivar v }
     | e = expr      { Iexpr e }
+;
 
 (* 
  * Définitions de la grammaire à proprement parler
@@ -101,12 +108,14 @@ instruction:
 decl:
     | v = var       { Dvar v }
     | m = methode   { Dmeth m }
+;
 
 var:
     | VAR; id = IDENT; ct = constyp?; EQUAL; e = expr
         { Var (id, ct, e) }
     | VAL; id = IDENT; ct = constyp?; EQUAL; e = expr
         { Val (id, ct, e) }
+;
 
 methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
@@ -131,30 +140,34 @@ methode:
                     res_expr = e
                 }
                 }
+;
 
 typ:
     id = IDENT; argst = arguments_type
         {{t_name = id;
         args_type = argst }} 
-
+;
 
 arguments_type:
     ts = typ_l?
         { ts }
-
+;
 
 param_type_classe:
     | ADD; p = param_type       {PTCplus p}
     | SUB; p = param_type       {PTCmoins p}
     | p = param_type            {PTCrien p} 
+;
 
 parametre:
     id = IDENT; CONS; t = typ   {{p_name = id; p_typ = t}}
+;
 
 param_type:
     | id = IDENT                { (id, None) }
     | id = IDENT; INF; t = typ  { (id, Some (Hinf t)) }
     | id = IDENT; SUP; t = typ  { (id, Some (Hsup t)) } 
+;
 
 classe:
     CLASS; id = IDENT; ptcs = param_type_classe_l?; ps = param_l?;
@@ -164,6 +177,7 @@ classe:
         params = ps;
         deriv = h;
         decls = decls }}
+;
 
 expr:
     | SUB; e = expr  %prec unary_minus { Emoins e } 
@@ -197,16 +211,20 @@ expr:
                             { Eprint e }
     | b = bloc              { Ebloc b }
     | RETURN; e = expr?     { Ereturn e }
+;
+
 
 bloc:
     LACC; instrs = separated_list(SEMICOLON, instruction); RACC
                     { instrs }
+;
 
 acces:
     | i1 = IDENT; DOT; i2 = IDENT   { Aident (i1, i2) }
     | e = expr; DOT; i = IDENT      { Aexpr (e, i) }
+;
 
-binop:
+%inline binop:
     | EQREF         { EqRef }
     | NEREF         { NeRef }
     | EQ            { Eq }
@@ -222,13 +240,15 @@ binop:
     | MOD           { Mod }
     | AND           { And }
     | OR            { Or }
+;
 
 classe_Main:
     OBJECT; MAIN; LACC; decls = separated_list(SEMICOLON, decl); RACC
         { decls }
+;
 
 fichier:
-    classes= classe*; main = classe_Main; EOF
+    classes = classe*; main = classe_Main; EOF
         {{ classes = classes; main = main }} 
 ;
 
