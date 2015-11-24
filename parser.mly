@@ -1,50 +1,103 @@
 
-/* Analyseur syntaxique pour mini-scala */
+(* Analyseur syntaxique pour mini-scala *)
 
 %{
     open Ast
 %}
 
-/* Déclaration des tokens */
+(* Déclaration des tokens
+ * INF et SUP       désignent   >: et <:
+ * EQ et NE         désignent   == et !=
+ * EQREF et NEREF   désignent   ne et eq
+ * NOT              désigne     !
+ * EQUAL            désigne     =
+ * Pour le reste c'est transparent *)
 
-%token EOF
 %token <int> INT
 %token <string> STRING
 %token <string> IDENT
+
 %token ADD SUB MUL DIV MOD INF SUP
 %token EQ NE LT LE GT GE AND OR
+
 %token CLASS DEF ELSE EQREF EXTENDS FALSE IF NEREF NEW NULL OBJECT
     OVERRIDE PRINT RETURN THIS TRUE VAL VAR WHILE
-%token MAIN
+%token MAIN EOF
 %token LPAR RPAR LACC RACC LCRO RCRO CONS EQUAL COMMA NOT DOT SEMICOLON
 
-/* Priorités et associativité des tokens */
+(* Priorités et associativité des tokens *)
 
-/* Points d'entrée de la grammaire */
+(* Points d'entrée de la grammaire *)
 %start fichier
 
-/* Types des valeurs renvoyées par l'analyseur syntaxique */
+(* Types des valeurs renvoyées par l'analyseur syntaxique *)
 %type <Ast.fichier> fichier
 
 %%
+
+(*
+ * Définitions intermédiaires utiles
+ *)
+
+(* : <type> *)
+constyp:
+    CONS; t = typ
+        { t }
+
+(* [ <type>+, ] *)
+typ_l:
+    LCRO; ts = separated_nonempty_list(COMMA, typ) ; RCRO
+        { ts }
+
+(* [ <param_type_classe>*, ] *)
+param_type_classe_l:
+    LCRO; ptcs = separated_list(COMMA, param_type_classe); RCRO
+        { ptcs }
+
+(* [ <param_type>+, ] *)
+param_type_l:
+    LCRO; pars = separated_nonempty_list(COMMA, param_type); RCRO
+        { pars }
+
+(* ( <parametres>*, ) *)
+param_l:
+    LPAR; params = separated_list(COMMA, parametre); RPAR
+        { params }
+
+(* ( <expr>*, ) *)
+expr_l:
+    LPAR; exprs = separated_list(COMMA, expr); RPAR
+        { exprs }
+
+(* extends <type> ( <expr>*, )?
+ * utile dans la définition des classes
+ *)
+heritage:
+    EXTENDS; t = typ; expr_lo = expr_l?
+        { (t, expr_lo) }
+
+(* var | expr *) 
+instruction:
+    | v = var       { Ivar v }
+    | e = expr      { Iexpr e }
+
+(* 
+ * Définitions de la grammaire à proprement parler
+ *)
 
 decl:
     | v = var       { Dvar v }
     | m = methode   { Dmeth m }
 
-constyp:
-    CONS; t = typ
-        { t }
-
 var:
-    | VAL; id = IDENT; ct = constyp?; EQUAL; e = expr
-        { Val (id, ct, e) }
     | VAR; id = IDENT; ct = constyp?; EQUAL; e = expr
         { Var (id, ct, e) }
+    | VAL; id = IDENT; ct = constyp?; EQUAL; e = expr
+        { Val (id, ct, e) }
 
 methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
-        LPAR; ps = separated_list(COMMA, parametre); b = bloc
+        LPAR; ps = separated_list(COMMA, parametre); RPAR; b = bloc
                 { Mblock {
                     mb_name = id;
                     mb_override = o;
@@ -54,7 +107,7 @@ methode:
                 }
                 }
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
-        LPAR; ps = separated_list(COMMA, parametre); CONS;
+        LPAR; ps = separated_list(COMMA, parametre); RPAR; CONS;
         t = typ; EQUAL; e = expr
                 { Mexpr {
                     me_name = id;
@@ -71,17 +124,10 @@ typ:
         {{t_name = id;
         args_type = argst }} 
 
-typ_l:
-    LCRO; ts = separated_nonempty_list(COMMA, typ) ; RCRO
-        { ts }
 
 arguments_type:
     ts = typ_l?
         { ts }
-
-param_type_classe_l:
-    LCRO; ptcs = separated_list(COMMA, param_type_classe); RCRO
-        { ptcs }
 
 
 param_type_classe:
@@ -96,22 +142,6 @@ param_type:
     | id = IDENT                { (id, None) }
     | id = IDENT; INF; t = typ  { (id, Some (Hinf t)) }
     | id = IDENT; SUP; t = typ  { (id, Some (Hsup t)) } 
-
-param_type_l:
-    LCRO; pars = separated_nonempty_list(COMMA, param_type); RCRO
-        { pars }
-
-param_l:
-    LPAR; params = separated_list(COMMA, parametre); RPAR
-        { params }
-
-expr_l:
-    LPAR; exprs = separated_list(COMMA, expr); RPAR
-        { exprs }
-
-heritage:
-    EXTENDS; t = typ; expr_lo = expr_l?
-        { (t, expr_lo) }
 
 classe:
     CLASS; id = IDENT; ptcs = param_type_classe_l?; ps = param_l?;
@@ -154,10 +184,6 @@ expr:
     | PRINT; LPAR; e = expr; RPAR
                             { Eprint e }
     | b = bloc              { Ebloc b }
-
-instruction:
-    | v = var       { Ivar v }
-    | e = expr      { Iexpr e }
 
 bloc:
     LACC; instrs = separated_list(SEMICOLON, instruction); RACC
