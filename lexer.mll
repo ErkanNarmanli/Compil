@@ -33,7 +33,25 @@
         "true",         TRUE;
         "val",          VAL;
         "var",          VAR;
-        "while",        WHILE
+        "while",        WHILE;
+        "Main",         MAIN
+    ]
+    let operators = [
+        "+",            ADD ;
+        "-",            SUB ;
+        "*",            MUL ;
+        "/",            DIV ;
+        "%",            MOD ;
+        ">:",           INF ;
+        "<:",           SUP ;
+        "==",           EQ ;
+        "!=",           NE ;
+        "<=",           LE ;
+        ">=",           GE ;
+        "<",            LT ;
+        ">",            GT ;
+        "&&",           AND ;
+        "||",           OR 
     ]
     
     let check_kw s = 
@@ -42,11 +60,19 @@
         with
         | Not_found _ -> IDENT s  
 
+    let check_op w =
+        try
+            List.assoc w operators
+        with
+        | Not_found _ -> raise (Lexing_error "Opérateur inconnu")
+
 }
     
-    let digit = ['0' - '9']
-    let alpha = ['a' - 'z'] | ['A' - 'Z']
-    let ident = alpha (alpha | digit | '_')
+    let digit   = ['0' - '9']
+    let symbol  = [' ' '!' '#' '$' '%' '&' ''' '(' ')' '*' '+' ',' '-' '.''/' ':' ';' '<' '>' '=' '?' '@' '[' ']' '^' '_' '`' '{' '}' '|' '~' '\"' '\n' '\r' '\\' ]
+    let alpha   = ['a' - 'z'] | ['A' - 'Z']
+    let car     = digit | symbol | alpha 
+    let ident   = alpha (alpha | digit | '_')
 
 
 rule token = parse
@@ -55,9 +81,12 @@ rule token = parse
     | "//"              { short_comment lexbuf }
     | "/*"              { long_comment lexbuf }
     | digit+ as i       { INT (int_of_string i) }
+    | symbol+ as w      { check_op w }
     | ident as s        { check_kw s }
+    | '"' (car* as s) '"' { STRING s } 
     | eof               { EOF }
     | _                 { assert false } 
+
 
 and short_comment = parse
     | '\n'              { newline lexbuf; token lexbuf }
