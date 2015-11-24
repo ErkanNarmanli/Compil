@@ -26,6 +26,7 @@
 %token LPAR RPAR LACC RACC LCRO RCRO CONS EQUAL COMMA NOT DOT SEMICOLON
 
 (* Priorités et associativité des tokens *)
+%right COMA SEMICOLON
 %nonassoc IF
 %nonassoc WHILE RETURN
 %right EQUAL
