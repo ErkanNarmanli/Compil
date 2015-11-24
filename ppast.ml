@@ -80,6 +80,7 @@ and print_meth_expr me =
 
 and print_parametre p = 
     print_ident p.p_name ;
+    print_string " : ";
     print_typ p.p_typ
 
 and print_smile = function
