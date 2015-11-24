@@ -37,6 +37,7 @@
 %left MUL DIV MOD
 %right NOT
 %left DOT
+%right unary_minus
 
 (* Points d'entrée de la grammaire *)
 %start fichier
@@ -164,6 +165,7 @@ classe:
         decls = decls }}
 
 expr:
+    | SUB; e = expr  %prec unary_minus { Emoins e } 
     | i = INT               { Eint i }
     | s = STRING            { Estr s }
     | TRUE                  { Ebool true }
@@ -182,7 +184,6 @@ expr:
             exprs = separated_list(COMMA, expr); RPAR
             { Enew (id, argst, exprs) }
     | NOT; e = expr         { Eneg e }
-    | SUB; e = expr         { Emoins e } %prec NOT
     | e1 = expr; b = binop; e2 = expr
                             { Ebinop (b, e1, e2) }
     | IF; LPAR; e1 = expr; RPAR; e2 = expr
@@ -191,10 +192,10 @@ expr:
                             { Eifelse (e1, e2, e3) }
     | WHILE; LPAR; e1 = expr; RPAR; e2 = expr
                             { Ewhile (e1, e2) }
-    | RETURN; e = expr?     { Ereturn e }
     | PRINT; LPAR; e = expr; RPAR
                             { Eprint e }
     | b = bloc              { Ebloc b }
+    | RETURN; e = expr?     { Ereturn e }
 
 bloc:
     LACC; instrs = separated_list(SEMICOLON, instruction); RACC
