@@ -26,6 +26,17 @@
 %token LPAR RPAR LACC RACC LCRO RCRO CONS EQUAL COMMA NOT DOT SEMICOLON
 
 (* Priorités et associativité des tokens *)
+%nonassoc IF
+%nonassoc WHILE RETURN
+%right EQUAL
+%left OR
+%left AND
+%left EQREF NEREF EQ NE
+%left GT GE LE LT
+%left ADD SUB
+%left MUL DIV MOD
+%right NOT
+%left DOT
 
 (* Points d'entrée de la grammaire *)
 %start fichier
@@ -51,7 +62,7 @@ typ_l:
 
 (* [ <param_type_classe>*, ] *)
 param_type_classe_l:
-    LCRO; ptcs = separated_list(COMMA, param_type_classe); RCRO
+    LCRO; ptcs = separated_nonempty_list(COMMA, param_type_classe); RCRO
         { ptcs }
 
 (* [ <param_type>+, ] *)
@@ -120,7 +131,7 @@ methode:
                 }
 
 typ:
-    id = IDENT; CONS; argst = arguments_type
+    id = IDENT; argst = arguments_type
         {{t_name = id;
         args_type = argst }} 
 
