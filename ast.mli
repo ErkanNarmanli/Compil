@@ -40,11 +40,13 @@ and meth_expr = {
 
 and parametre = {
     p_name      : ident ;
-    typ         : typ   ; }
+    p_typ         : typ   ; }
 
-and param_type = 
-    | PTinf of ident * typ option (* >: *)
-    | PTsup of ident * typ option (* <: *)
+and param_type_heritage =
+    | Hinf of typ (* >: *)
+    | Hsup of typ (* <: *)
+
+and param_type = ident * param_type_heritage option
 
 and param_type_classe = 
     | PTCplus   of param_type

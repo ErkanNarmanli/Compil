@@ -1,5 +1,5 @@
 CMO=ppast.cmo lexer.cmo parser.cmo main.cmo
-GENERATED=lexer.ml parser.ml parser.mli
+GENERATED=lexer.ml parser.ml parser.mli parser.automaton parser.conflicts
 BIN=main
 
 make: $(BIN)

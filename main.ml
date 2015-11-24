@@ -61,11 +61,10 @@ let () =
 
     Interp.fichier p*)
   with
-    | Lexer.Lexing_error (c,pos) ->
+    | Lexer.Lexing_error c ->
 	(* Erreur lexicale. On récupère sa position absolue et
 	   on la convertit en numéro de ligne *)
 	localisation (Lexing.lexeme_start_p buf);
-    localisation pos;
     eprintf "Erreur lexicale: %s@." c;
 	exit 1
     | Parser.Error ->
