@@ -3,9 +3,14 @@ open Printf
 
 let print_ident = print_string
 
+let rec print_int_list func sep = function
+    | []    -> ()
+    | [a]   -> func a
+    | a::q  -> func a ; print_string sep ; print_int_list func sep q
+
 let print_list func deb sep fin xs =
     print_string deb ;
-    List.iter (fun x -> func x ; print_string sep) xs ;
+    print_int_list func sep xs ;
     print_string fin
 
 let print_o func = function
