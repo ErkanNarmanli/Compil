@@ -187,7 +187,7 @@ and print_binop = function
     | Or        -> print_string "||"
 
 and print_acces = function
-    | Aident i              -> print_string i1
+    | Aident i              -> print_string i
     | Aexpr_ident (e, i)    -> print_expr e; print_char '.'; print_string i
 
 let print f = print_fichier f; print_endline ""
