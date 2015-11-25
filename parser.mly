@@ -26,7 +26,7 @@
 %token LPAR RPAR LACC RACC LCRO RCRO CONS EQUAL COMMA NOT DOT SEMICOLON
 
 (* Priorités et associativité des tokens *)
-%nonassoc IF
+%nonassoc IF ELSE
 %nonassoc WHILE RETURN
 %right EQUAL
 %left OR
@@ -198,14 +198,14 @@ expr:
             exprs = separated_list(COMMA, expr); RPAR
             { Enew (id, argst, exprs) }
     | RETURN; e = expr      { Ereturn (Some e) }
-    | NOT; e = expr         { Eneg e }
-    | SUB; e = expr { Emoins e } %prec unary_minus  
     | e1 = expr; b = binop; e2 = expr
                             { Ebinop (b, e1, e2) }
-    | IF; LPAR; e1 = expr; RPAR; e2 = expr
-                            { Eif (e1, e2) }
+    | NOT; e = expr         { Eneg e }
+    | SUB; e = expr { Emoins e } %prec unary_minus  
     | IF; LPAR; e1 = expr; RPAR; e2 = expr; ELSE; e3 = expr
                             { Eifelse (e1, e2, e3) }
+    | IF; LPAR; e1 = expr; RPAR; e2 = expr
+                            { Eif (e1, e2) }
     | WHILE; LPAR; e1 = expr; RPAR; e2 = expr
                             { Ewhile (e1, e2) }
     | PRINT; LPAR; e = expr; RPAR
