@@ -205,7 +205,7 @@ expr:
     | RETURN; e = expr      { Ereturn (Some e) }
     | e1 = expr; b = binop; e2 = expr
                             { Ebinop (b, e1, e2) }
-    | NOT; e = expr         { Eneg e }
+    | NOT; e = expr         { Eneg e }  
     | SUB; e = expr         { Emoins e } %prec unary_minus  
     | WHILE; LPAR; e1 = expr; RPAR; e2 = expr
                             { Ewhile (e1, e2) } %prec WHILE
