@@ -92,6 +92,6 @@ and binop = EqRef | NeRef | Eq | Ne | Lt | Le | Gt | Ge | Add | Sub | Mul | Div 
 (* EqRef = eq ; NeRef = ne ; Eq = == ; Ne = != *)
 
 and acces = 
-    | Aident    of ident * ident
-    | Aexpr     of expr * ident
+    | Aident        of ident
+    | Aexpr_ident   of expr * ident
 

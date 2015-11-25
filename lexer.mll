@@ -93,7 +93,7 @@
     let symbol  = ['!' '#' '$' '%' '&' ''' '+' ',' '-' '.' ':' ';' '<' '>' '=' '?' '@' '^' '_' '`' '|' '~' '\\' ]
     let limits  = ['(' ')' '[' ']' '{' '}']
     let alpha   = ['a' - 'z'] | ['A' - 'Z']
-    let car     = digit | symbol | alpha | limits | ' ' | '\n' | '/' | '*' | '"'
+    let car     = digit | symbol | alpha | limits | ' ' | '\n' | '/' | '*' | "\\\""
     let ident   = alpha (alpha | digit | '_')*
 
 
