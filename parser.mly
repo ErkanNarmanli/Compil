@@ -180,7 +180,6 @@ classe:
 ;
 
 expr:
-    | SUB; e = expr  %prec unary_minus { Emoins e } 
     | i = INT               { Eint i }
     | s = STRING            { Estr s }
     | TRUE                  { Ebool true }
@@ -198,7 +197,9 @@ expr:
     | NEW; id = IDENT; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
             { Enew (id, argst, exprs) }
+    | RETURN; e = expr      { Ereturn (Some e) }
     | NOT; e = expr         { Eneg e }
+    | SUB; e = expr { Emoins e } %prec unary_minus  
     | e1 = expr; b = binop; e2 = expr
                             { Ebinop (b, e1, e2) }
     | IF; LPAR; e1 = expr; RPAR; e2 = expr
@@ -210,7 +211,7 @@ expr:
     | PRINT; LPAR; e = expr; RPAR
                             { Eprint e }
     | b = bloc              { Ebloc b }
-    | RETURN; e = expr?     { Ereturn e }
+    | RETURN;               { Ereturn None }
 ;
 
 
