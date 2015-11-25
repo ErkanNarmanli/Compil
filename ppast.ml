@@ -117,7 +117,9 @@ and print_expr = function
     | Ethis             -> print_string "this"
     | Enull             -> print_string "null"
     | Eint i            -> print_int i
-    | Estr s            -> print_string s
+    | Estr s            -> print_char '"';
+                           print_string s;
+                           print_char '"'
     | Ebool b           -> print_string (string_of_bool b)
     | Eacc acc          -> print_acces acc
     | Eacc_exp (acc, e) -> print_acces acc;
