@@ -26,7 +26,8 @@
 %token LPAR RPAR LACC RACC LCRO RCRO CONS EQUAL COMMA NOT DOT SEMICOLON
 
 (* Priorités et associativité des tokens *)
-%nonassoc IF ELSE
+%nonassoc IF 
+%nonassoc ELSE
 %nonassoc WHILE RETURN
 %right EQUAL
 %left OR
@@ -190,24 +191,24 @@ expr:
     | LPAR; e = expr; RPAR  { e }
     | a = acces             { Eacc a }
     | a = acces; EQUAL; e = expr
-            { Eacc_exp (a, e) }
+                            { Eacc_exp (a, e) }
     | a = acces; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
-            { Eacc_typ_exp (a, argst, exprs) }
+                            { Eacc_typ_exp (a, argst, exprs) }
     | NEW; id = IDENT; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
-            { Enew (id, argst, exprs) }
+                            { Enew (id, argst, exprs) }
+    | IF; LPAR; e1 = expr; RPAR; e2 = expr
+                            { Eif (e1, e2) } %prec IF
+    | IF; LPAR; e1 = expr; RPAR; e2 = expr; ELSE; e3 = expr
+                            { Eifelse (e1, e2, e3) }
     | RETURN; e = expr      { Ereturn (Some e) }
     | e1 = expr; b = binop; e2 = expr
                             { Ebinop (b, e1, e2) }
     | NOT; e = expr         { Eneg e }
-    | SUB; e = expr { Emoins e } %prec unary_minus  
-    | IF; LPAR; e1 = expr; RPAR; e2 = expr; ELSE; e3 = expr
-                            { Eifelse (e1, e2, e3) }
-    | IF; LPAR; e1 = expr; RPAR; e2 = expr
-                            { Eif (e1, e2) }
+    | SUB; e = expr         { Emoins e } %prec unary_minus  
     | WHILE; LPAR; e1 = expr; RPAR; e2 = expr
-                            { Ewhile (e1, e2) }
+                            { Ewhile (e1, e2) } %prec WHILE
     | PRINT; LPAR; e = expr; RPAR
                             { Eprint e }
     | b = bloc              { Ebloc b }
@@ -217,7 +218,7 @@ expr:
 
 bloc:
     LACC; instrs = separated_list(SEMICOLON, instruction); RACC
-                    { instrs }
+                            { instrs }
 ;
 
 acces:
