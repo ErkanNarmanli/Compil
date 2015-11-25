@@ -55,6 +55,7 @@
         "&&",           AND ;
         "||",           OR;
         ",",            COMMA;
+        ";",            SEMICOLON;
         ":",            CONS
     ]
     
@@ -88,11 +89,11 @@
 }
     
     let digit   = ['0' - '9']
-    let symbol  = ['!' '#' '$' '%' '&' ''' '*' '+' ',' '-' '.' '/' ':' ';' '<' '>' '=' '?' '@' '^' '_' '`' '|' '~' '"' '\\' ]
+    let symbol  = ['!' '#' '$' '%' '&' ''' '+' ',' '-' '.' ':' ';' '<' '>' '=' '?' '@' '^' '_' '`' '|' '~' '"' '\\' ]
     let limits  = ['(' ')' '[' ']' '{' '}']
     let alpha   = ['a' - 'z'] | ['A' - 'Z']
-    let car     = digit | symbol | alpha | limits | ' ' | '\n'
-    let ident   = alpha (alpha | digit | '_') *
+    let car     = digit | symbol | alpha | limits | ' ' | '\n' | '/' | '*'
+    let ident   = alpha (alpha | digit | '_')*
 
 
 rule token = parse
@@ -100,6 +101,8 @@ rule token = parse
     | ['\n' '\r']           { newline lexbuf; token lexbuf }
     | "//"                  { short_comment lexbuf }
     | "/*"                  { long_comment lexbuf }
+    | '/'                   { DIV }
+    | '*'                   { MUL }
     | symbol+ as w          { check_op w }
     | digit+ as i           { INT (int_of_string i) }
     | ident as s            { check_kw s }
