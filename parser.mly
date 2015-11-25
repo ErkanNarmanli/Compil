@@ -222,8 +222,8 @@ bloc:
 ;
 
 acces:
-    | i1 = IDENT; DOT; i2 = IDENT   { Aident (i1, i2) }
-    | e = expr; DOT; i = IDENT      { Aexpr (e, i) }
+    | i = IDENT                     { Aident i }
+    | e = expr; DOT; i = IDENT      { Aexpr_ident (e, i) }
 ;
 
 %inline binop:
