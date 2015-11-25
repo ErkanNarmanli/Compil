@@ -30,4 +30,3 @@ pscala
 *parser.mli
 ppast
 main
-*.scala
