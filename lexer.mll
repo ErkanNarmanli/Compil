@@ -55,6 +55,7 @@
         "&&",           AND ;
         "||",           OR;
         ",",            COMMA;
+        ".",            DOT;
         ";",            SEMICOLON;
         ":",            CONS;
         "!",            NOT
