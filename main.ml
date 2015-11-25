@@ -6,6 +6,7 @@ open Lexing
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
+let error_only = ref false
 
 (* Noms des fichiers source et cible *)
 let ifile = ref ""
@@ -16,7 +17,10 @@ let set_file f s = f := s
 (* Les options du compilateur que l'on affiche avec --help *)
 let options =
   ["--parse-only", Arg.Set parse_only,
-   "  Pour ne faire uniquement que la phase d'analyse syntaxique"]
+   "  Pour ne faire uniquement que la phase d'analyse syntaxique";
+   "--error-only", Arg.Set error_only, 
+   " Pour n'afficher que les erreurs"
+  ]
 
 let usage = "usage: mini-turtle [option] file.logo"
 
@@ -52,14 +56,20 @@ let () =
        n'est détectée.
        La fonction Lexer.token est utilisée par Parser.fichier pour obtenir
        le prochain token. *)
+    
     let p = Parser.fichier Lexer.token buf in
     close_in f;
-    Ppast.print p;
-(*
+    
+    if not !error_only then
+        Ppast.print p;
+
+    if !error_only then
+
+
     (* On s'arrête ici si on ne veut faire que le parsing *)
     if !parse_only then exit 0;
 
-    Interp.fichier p*)
+    (*Interp.fichier p*)
   with
     | Lexer.Lexing_error c ->
 	(* Erreur lexicale. On récupère sa position absolue et
