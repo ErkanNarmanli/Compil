@@ -181,76 +181,110 @@ classe:
 ;
 
 expr:
-    | i = INT               { Eint i }
-    | s = STRING            { Estr s }
-    | TRUE                  { Ebool true }
-    | FALSE                 { Ebool false }
-    | LPAR; RPAR            { Evoid }
-    | THIS                  { Ethis }
-    | NULL                  { Enull }
-    | LPAR; e = expr; RPAR  { e }
-    | a = acces             { Eacc a }
+    | i = INT               
+            {{ e_cont = Eint i; e_loc = ($startpos, $endpos) }}
+    | s = STRING           
+            {{ e_cont = Estr s; e_loc = ($startpos, $endpos) } }
+    | TRUE 
+            {{ e_cont = Ebool true; e_loc = ($startpos, $endpos) } }
+    | FALSE                 
+            {{ e_cont = Ebool false; e_loc = ($startpos, $endpos) } }
+    | LPAR; RPAR            
+            {{ e_cont = Evoid; e_loc = ($startpos, $endpos) } }
+    | THIS                  
+            {{ e_cont = Ethis; e_loc = ($startpos, $endpos) } }
+    | NULL                  
+            {{ e_cont = Enull; e_loc = ($startpos, $endpos) } }
+    | LPAR; e = expr; RPAR  
+            {{ e_cont = e; e_loc = ($startpos, $endpos) } }
+    | a = acces             
+            {{ e_cont = Eacc a; e_loc = ($startpos, $endpos) }}
     | a = acces; EQUAL; e = expr
-                            { Eacc_exp (a, e) }
+            {{ e_cont = Eacc_exp (a, e); e_loc = ($startpos, $endpos) }}
     | a = acces; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
-                            { Eacc_typ_exp (a, argst, exprs) }
+            {{ e_cont = Eacc_typ_exp (a, argst, exprs); e_loc =
+                ($startpos,$endloc) }}
     | NEW; id = IDENT; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
-                            { Enew (id, argst, exprs) }
+            {{ e_cont = Enew (id, argst, exprs); e_loc = ($startpos, $endpos) }}
     | IF; LPAR; e1 = expr; RPAR; e2 = expr
-                            { Eif (e1, e2) } %prec IF
+            {{ e_cont = Eif (e1, e2); e_loc = ($startpos, $endpos) }} %prec IF
     | IF; LPAR; e1 = expr; RPAR; e2 = expr; ELSE; e3 = expr
-                            { Eifelse (e1, e2, e3) }
-    | RETURN; e = expr      { Ereturn (Some e) }
+            {{ e_cont =  Eifelse (e1, e2, e3); e_loc = ($startpos, $endpos) }}
+    | RETURN; e = expr      
+            {{ e_cont = Ereturn (Some e); e_loc = ($startpos, $endpos) }}
     | e1 = expr; b = binop; e2 = expr
-                            { Ebinop (b, e1, e2) }
-    | NOT; e = expr         { Eneg e }  
-    | SUB; e = expr         { Emoins e } %prec unary_minus  
+            {{ e_cont = Ebinop (b, e1, e2); e_loc = e_loc = ($startpos, $endpos)
+            }}
+    | NOT; e = expr         
+            {{ e_cont = Eneg e; e_pos = ($startpos, $endpos) }}  
+    | SUB; e = expr         
+            {{ e_cont = Emoins e; e_loc = ($startpos, $endpos) }} %prec unary_minus  
     | WHILE; LPAR; e1 = expr; RPAR; e2 = expr
-                            { Ewhile (e1, e2) } %prec WHILE
+            {{ e_cont = Ewhile (e1, e2); e_loc = ($startpos, $endpos) }} %prec WHILE
     | PRINT; LPAR; e = expr; RPAR
-                            { Eprint e }
-    | b = bloc              { Ebloc b }
-    | RETURN;               { Ereturn None }
+            {{ e_cont = Eprint e; e_loc = ($startpos, $endpos) }}
+    | b = bloc             
+            {{ e_cont = Ebloc b; e_pos = ($startpos, $endpos) }}
+    | RETURN;               
+            {{ e_cont = Ereturn None; e_loc = ($startpos, $endpos) }}
 ;
 
 
 bloc:
     LACC; instrs = separated_list(SEMICOLON, instruction); RACC
-                            { instrs }
+            {{ bl_cont = instrs; bl_loc = loc }}
 ;
 
 acces:
-    | i = IDENT                     { Aident i }
-    | e = expr; DOT; i = IDENT      { Aexpr_ident (e, i) }
+    | i = IDENT             {{ a_cont = Aident i;
+                               a_loc = ($startpos, $endpos) }}
+    | e = expr; DOT; i = IDENT
+                            {{ a_cont = Aexpr_ident (e, i);
+                               a_loc = ($startpos, $endpos) }}
 ;
 
 %inline binop:
-    | EQREF         { EqRef }
-    | NEREF         { NeRef }
-    | EQ            { Eq }
-    | NE            { Ne }
-    | LT            { Lt }
-    | LE            { Le }
-    | GT            { Gt }
-    | GE            { Ge }
-    | ADD           { Add }
-    | SUB           { Sub }
-    | MUL           { Mul }
-    | DIV           { Div }
-    | MOD           { Mod }
-    | AND           { And }
-    | OR            { Or }
+    | EQREF         {{ b_cont = EqRef ;
+                       b_loc = ($startpos, $endpos) }}
+    | NEREF         {{ b_cont = NeRef ;
+                       b_loc = ($startpos, $endpos) }}
+    | EQ            {{ b_cont = Eq ;
+                       b_loc = ($startpos, $endpos) }}
+    | NE            {{ b_cont = Ne ;
+                       b_loc = ($startpos, $endpos) }}
+    | LT            {{ b_cont = Lt ;
+                       b_loc = ($startpos, $endpos) }}
+    | LE            {{ b_cont = Le ;
+                       b_loc = ($startpos, $endpos) }}
+    | GT            {{ b_cont = Gt ;
+                       b_loc = ($startpos, $endpos) }}
+    | GE            {{ b_cont = Ge ;
+                       b_loc = ($startpos, $endpos) }}
+    | ADD           {{ b_cont = Add ;
+                       b_loc = ($startpos, $endpos) }}
+    | SUB           {{ b_cont = Sub ;
+                       b_loc = ($startpos, $endpos) }}
+    | MUL           {{ b_cont = Mul;
+                       b_loc = ($startpos, $endpos) }}
+    | DIV           {{ b_cont = Div;
+                       b_loc = ($startpos, $endpos) }}
+    | MOD           {{ b_cont = Mod;
+                       b_loc = ($startpos, $endpos) }}
+    | AND           {{ b_cont = And;
+                       b_loc = ($startpos, $endpos) }}
+    | OR            {{ b_cont = Or;
+                       b_loc = ($startpos, $endpos) }}
 ;
 
 classe_Main:
     OBJECT; MAIN; LACC; decls = separated_list(SEMICOLON, decl); RACC
-        { decls }
+        {{ cM_cont = decls; cM_loc = ($startpos, $endpos) }}
 ;
 
 fichier:
     classes = classe*; main = classe_Main; EOF
-        {{ classes = classes; main = main }} 
+        {{ classes = classes; main = main; f_loc = ($startpos, $endpos) }} 
 ;
 
