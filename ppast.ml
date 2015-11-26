@@ -98,7 +98,7 @@ and print_param_type {pt_cont = (id, ho); pt_loc = _ } =
         | None          -> ()
         | Some smile    -> print_smile smile
 
-and print_param_type_classe ptc = match ptc.pet_cont with
+and print_param_type_classe ptc = match ptc.ptc_cont with
     | PTCplus p     -> print_string "+";
                        print_param_type p
     | PTCmoins p    -> print_string "-";
@@ -112,7 +112,7 @@ and print_arguments_type {at_cont = argts; at_loc = _ } = print_list_o print_typ
 
 and print_classe_Main { cM_cont = cm; cM_loc = _ } = print_list print_decl "object Main {" ";\n" "}\n" cm
 
-and print_expr = function
+and print_expr e = match e.e_cont with
     | Evoid             -> print_string "()"
     | Ethis             -> print_string "this"
     | Enull             -> print_string "null"
@@ -163,13 +163,13 @@ and print_expr = function
                            print_string ")"
     | Ebloc b           -> print_bloc b
 
-and print_bloc b = print_list print_instruction "{" ";\n" "}" b
+and print_bloc b = print_list print_instruction "{" ";\n" "}" b.bl_cont
 
 and print_instruction = function
     | Ivar v    -> print_var v
     | Iexpr e   -> print_expr e
 
-and print_binop = function
+and print_binop b  = match b.b_cont with
     | EqRef     -> print_string "eq"
     | NeRef     -> print_string "ne"
     | Eq        -> print_string "=="
@@ -186,7 +186,7 @@ and print_binop = function
     | And       -> print_string "&&"
     | Or        -> print_string "||"
 
-and print_acces = function
+and print_acces a = match a.a_cont with
     | Aident i              -> print_string i
     | Aexpr_ident (e, i)    -> print_expr e; print_char '.'; print_string i
 

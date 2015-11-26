@@ -108,7 +108,7 @@ instruction:
 
 decl:
     | v = var       {{ decl_cont = Dvar v   ; decl_loc  = ($startpos, $endpos) }}
-    | m = methode   {{ m_cont = Dmeth m     ; m_loc     = ($startpos, $endpos) }}
+    | m = methode   {{ decl_cont = Dmeth m  ; decl_loc     = ($startpos, $endpos) }}
 ;
 
 var:
@@ -152,7 +152,7 @@ typ:
 
 arguments_type:
     ts = typ_l?
-        {{ at_cont = ts ; ac_loc = ($startpos, $endpos) }}
+        {{ at_cont = ts ; at_loc = ($startpos, $endpos) }}
 ;
 
 param_type_classe:
@@ -239,7 +239,7 @@ expr:
 
 bloc:
     LACC; instrs = separated_list(SEMICOLON, instruction); RACC
-            {{ bl_cont = instrs; bl_loc = loc }}
+            {{ bl_cont = instrs; bl_loc = ($startpos, $endpos) }}
 ;
 
 acces:
