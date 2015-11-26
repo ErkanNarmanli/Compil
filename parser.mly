@@ -201,7 +201,7 @@ expr:
     | NULL                  
             {{ e_cont = Enull; e_loc = ($startpos, $endpos) } }
     | LPAR; e = expr; RPAR  
-            {{ e_cont = e; e_loc = ($startpos, $endpos) } }
+            {{ e_cont = e.e_cont; e_loc = ($startpos, $endpos) } }
     | a = acces             
             {{ e_cont = Eacc a; e_loc = ($startpos, $endpos) }}
     | a = acces; EQUAL; e = expr
