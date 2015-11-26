@@ -189,7 +189,7 @@ expr:
     | i = INT               
             {{ e_cont = Eint i; e_loc = ($startpos, $endpos) }}
     | s = STRING           
-            {{ e_cont = Estr s; e_loc = ($startpos, $endpos) } }
+            {{ e_cont = Estr s; e_loc = ($startpos, $endpos) }}
     | TRUE 
             {{ e_cont = Ebool true; e_loc = ($startpos, $endpos) } }
     | FALSE                 
