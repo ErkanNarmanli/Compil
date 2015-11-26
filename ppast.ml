@@ -36,11 +36,11 @@ and print_classe cl =
     end ;
     print_list print_decl "\n\t{" ", " "}" cl.decls
 
- and print_decl = function
+ and print_decl d = match d.decl_cont with 
     | Dvar v   -> print_var v
     | Dmeth m  -> print_methode m
 
-and print_var = function
+and print_var v = match v.v_cont with
     | Val (i, o_t, e)   ->  print_string "val " ;
                             print_ident i ;
                             begin match o_t with 
@@ -60,7 +60,7 @@ and print_var = function
                             print_string " =" ;
                             print_expr e
 
-and print_methode = function 
+and print_methode m = match m.m_cont with 
     | Mblock mb -> print_meth_bloc mb
     | Mexpr me  -> print_meth_expr me
 
@@ -92,13 +92,13 @@ and print_smile = function
     | Hinf t    -> print_string " >: "; print_typ t
     | Hsup t    -> print_string " <: "; print_typ t
 
-and print_param_type (id, ho) = 
+and print_param_type {pt_cont = (id, ho); pt_loc = _ } = 
     print_string id;
     match ho with
         | None          -> ()
         | Some smile    -> print_smile smile
 
-and print_param_type_classe = function
+and print_param_type_classe ptc = match ptc.pet_cont with
     | PTCplus p     -> print_string "+";
                        print_param_type p
     | PTCmoins p    -> print_string "-";
@@ -108,9 +108,9 @@ and print_param_type_classe = function
 and print_typ typ = Printf.printf "%s " typ.t_name;
                     print_arguments_type typ.args_type
 
-and print_arguments_type argts = print_list_o print_typ "[" "," "]" argts
+and print_arguments_type {at_cont = argts; at_loc = _ } = print_list_o print_typ "[" "," "]" argts
 
-and print_classe_Main cm = print_list print_decl "object Main {" ";\n" "}\n" cm
+and print_classe_Main { cM_cont = cm; cM_loc = _ } = print_list print_decl "object Main {" ";\n" "}\n" cm
 
 and print_expr = function
     | Evoid             -> print_string "()"
