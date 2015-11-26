@@ -107,15 +107,15 @@ instruction:
  *)
 
 decl:
-    | v = var       {{ Dvar v   ; decl_loc  = ($startpos, $endpos) }}
-    | m = methode   {{ Dmeth m  ; m_loc     = ($startpos, $endpos) }}
+    | v = var       {{ decl_cont = Dvar v   ; decl_loc  = ($startpos, $endpos) }}
+    | m = methode   {{ m_cont = Dmeth m     ; m_loc     = ($startpos, $endpos) }}
 ;
 
 var:
     | VAR; id = IDENT; ct = constyp?; EQUAL; e = expr
-        {{ Var (id, ct, e) ; v_loc = ($startpos, $endpos) }}
+        {{ v_cont = Var (id, ct, e) ; v_loc = ($startpos, $endpos) }}
     | VAL; id = IDENT; ct = constyp?; EQUAL; e = expr
-        {{ Val (id, ct, e) ; v_loc = ($startpos, $endpos) }}
+        {{ v_cont = Val (id, ct, e) ; v_loc = ($startpos, $endpos) }}
 ;
 
 methode:
@@ -132,7 +132,7 @@ methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; CONS;
         t = typ; EQUAL; e = expr
-                {{  m_desc          = Mexpr {
+                {{  m_desc          = Mexpr ;
                     me_name         = id    ;
                     me_override     = o     ;
                     me_type_params  = pts   ;
@@ -156,9 +156,9 @@ arguments_type:
 ;
 
 param_type_classe:
-    | ADD; p = param_type {{ PTCplus  p ; ptc_loc = ($startpos, $endpos) }}
-    | SUB; p = param_type {{ PTCmoins p ; ptc_loc = ($startpos, $endpos)}}
-    | p = param_type      {{ PTCrien  p ; ptc_loc = ($startpos, $endpos) }} ;
+    | ADD; p = param_type {{ ptc_cont = PTCplus  p ; ptc_loc = ($startpos, $endpos) }}
+    | SUB; p = param_type {{ ptc_cont = PTCmoins p ; ptc_loc = ($startpos, $endpos)}}
+    | p = param_type      {{ ptc_cont = PTCrien  p ; ptc_loc = ($startpos, $endpos) }} ;
 
 parametre:
     id = IDENT; CONS; t = typ   {{p_name    = id ; 
@@ -171,7 +171,7 @@ param_type:
                                 pt_loc = ($startpos, $endpos) }}
     | id = IDENT; INF; t = typ  {{ pt_cont = (id, Some (Hinf t)) ; 
                                 pt_loc = ($startpos, $endpos) }}
-    | id = IDENT; SUP; t = typ  {{ pt_cont (id, Some (Hsup t)) ; 
+    | id = IDENT; SUP; t = typ  {{ pt_cont = (id, Some (Hsup t)) ; 
                                 pt_loc = ($startpos, $endpos)}} ;
 
 classe:
