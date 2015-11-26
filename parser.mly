@@ -209,7 +209,7 @@ expr:
     | a = acces; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
             {{ e_cont = Eacc_typ_exp (a, argst, exprs); e_loc =
-                ($startpos,$endloc) }}
+                ($startpos,$endpos) }}
     | NEW; id = IDENT; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
             {{ e_cont = Enew (id, argst, exprs); e_loc = ($startpos, $endpos) }}
