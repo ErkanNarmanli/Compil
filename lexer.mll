@@ -58,19 +58,34 @@
             List.assoc d delimitors
         with 
         | _ ->  assert false
+
+
+    let implode l =
+          let result = String.create (List.length l) in
+          let rec imp i = function
+          | [] ->       result
+          | c :: l ->   result.[i] <- c; imp (i + 1) l in
+                        imp 0 l
+
 }
-    
+
     let digit   = ['0' - '9']
-    let symbol  = ['!' '#' '$' '%' '&' ''' '+' ',' '-' '.' ':' ';' '<' '>' '=' '?' '@' '^' '_' '`' '|' '~' '\\' ]
+    let entier  = '0' | (['1' - '9'] digit*)
+    let symbol  = ['\\' '\n' '\t' '!' '#' '$' '%' '&' ''' '+' ',' '-' '.' ':' ';' '<' '>' '='
+    '?' '@' '^' '_' '`' '|' '~' ' ' '/' '*' ]
     let limits  = ['(' ')' '[' ']' '{' '}']
     let alpha   = ['a' - 'z'] | ['A' - 'Z']
-    let car     = digit | symbol | alpha | limits | ' ' | '\n' | '/' | '*' | "\\\""
+    let car     = digit | symbol | alpha | limits  
     let ident   = alpha (alpha | digit | '_')*
 
 
 rule token = parse
     | [' ' '\t']+           { token lexbuf }
     | ['\n' '\r']           { newline lexbuf; token lexbuf }
+    | '"'                   { lex_chaine "" lexbuf } 
+    | entier as i           { INT (int_of_string i) }
+    | ident as s            { check_kw s }
+    | limits as d           { check_del d }
     | "//"                  { short_comment lexbuf }
     | "/*"                  { long_comment lexbuf }
     | '/'                   { DIV }
@@ -94,13 +109,18 @@ rule token = parse
     | ";"                   { SEMICOLON }
     | ":"                   { CONS }
     | "!"                   { NOT }
-    | digit+ as i           { INT (int_of_string i) }
-    | ident as s            { check_kw s }
-    | '"' (car* as s) '"'   { STRING s } 
-    | limits as d           { check_del d }
     | eof                   { EOF }
     | _                     { raise (Lexing_error "Caractère inconnu") } 
 
+and lex_chaine s = parse
+    | '"'                   { STRING s }
+    | '\\' 't'              { lex_chaine (s^"\t") lexbuf }   
+    | '\\' 'n'              { lex_chaine (s^"\n") lexbuf }   
+    | '\\' '\\'             { lex_chaine (s^"\\") lexbuf }
+    | '\\' '"'              { lex_chaine (s^"\"") lexbuf }
+    | car as c              { lex_chaine (s^(String.make 1 c)) lexbuf }
+    | eof                   { raise (Lexing_error "chaine de caractère non terminée") }
+    | _                     { raise (Lexing_error "caractère non reconnu")}
 
 and short_comment = parse
     | '\n'                  { newline lexbuf; token lexbuf }
