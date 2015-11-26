@@ -59,11 +59,7 @@ and parametre = {
     p_typ       : typ   ; 
     p_loc       : loc ; }
 
-and param_type_heritage = {
-    pth_cont    : param_type_heritageCont ;
-    pth_loc     : loc ; }
-
-and param_type_heritageCont =
+and param_type_heritage =
     | Hinf of typ (* >: *)
     | Hsup of typ (* <: *)
 
