@@ -32,7 +32,7 @@ and varCont =
     | Var   of ident * (typ option) * expr
 
 and methode = {
-    m_desc  : methodeCont ;
+    m_cont  : methodeCont ;
     m_loc   : loc ; }
 
 and methodeCont = (*localisé dans meth_block et meth_expr*)

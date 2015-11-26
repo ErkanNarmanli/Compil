@@ -121,7 +121,7 @@ var:
 methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; b = bloc
-                {{  m_desc          = Mblock {
+                {{  m_cont          = Mblock {
                     mb_name         = id    ;
                     mb_override     = o     ;
                     mb_type_params  = pts   ;
@@ -132,7 +132,7 @@ methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; CONS;
         t = typ; EQUAL; e = expr
-                {{  m_desc          = Mexpr ;
+                {{  m_cont          = Mexpr {
                     me_name         = id    ;
                     me_override     = o     ;
                     me_type_params  = pts   ;
@@ -140,7 +140,7 @@ methode:
                     res_type        = t     ;
                     res_expr        = e
                 } ; m_loc           = ($startpos, $endpos)
-                }
+                }}
 ;
 
 typ:
@@ -220,10 +220,10 @@ expr:
     | RETURN; e = expr      
             {{ e_cont = Ereturn (Some e); e_loc = ($startpos, $endpos) }}
     | e1 = expr; b = binop; e2 = expr
-            {{ e_cont = Ebinop (b, e1, e2); e_loc = e_loc = ($startpos, $endpos)
+            {{ e_cont = Ebinop (b, e1, e2); e_loc = ($startpos, $endpos)
             }}
     | NOT; e = expr         
-            {{ e_cont = Eneg e; e_pos = ($startpos, $endpos) }}  
+            {{ e_cont = Eneg e; e_loc = ($startpos, $endpos) }}  
     | SUB; e = expr         
             {{ e_cont = Emoins e; e_loc = ($startpos, $endpos) }} %prec unary_minus  
     | WHILE; LPAR; e1 = expr; RPAR; e2 = expr
@@ -231,7 +231,7 @@ expr:
     | PRINT; LPAR; e = expr; RPAR
             {{ e_cont = Eprint e; e_loc = ($startpos, $endpos) }}
     | b = bloc             
-            {{ e_cont = Ebloc b; e_pos = ($startpos, $endpos) }}
+            {{ e_cont = Ebloc b; e_loc = ($startpos, $endpos) }}
     | RETURN;               
             {{ e_cont = Ereturn None; e_loc = ($startpos, $endpos) }}
 ;
