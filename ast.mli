@@ -1,25 +1,37 @@
-type ident = string
+type loc    = Lexing.position * Lexing.position (* debut * fin *)
+
+type ident  = string
 
 type fichier = {
     classes     : classe list ;
-    main        : classe_Main ; }
+    main        : classe_Main ; 
+    f_loc       : loc ; }
 
 and classe = {
     c_name              : ident ;
     type_class_params   : (param_type_classe list) option ;
     params              : (parametre list) option ; (*paramètres*)
     deriv               : (typ * expr list option) option;(*héritage*)
-    decls               : decl list ; }
+    decls               : decl list ; 
+    c_loc               : loc ; }
 
-and decl =
+and decl = {
+    decl_cont   : declCont ;
+    decl_loc    : loc       ; }
+
+and declCont =
     | Dvar of var
     | Dmeth of methode
 
-and var =
+and var = {
+    v_cont      : varCont ;
+    v_loc       : loc   ; }
+
+and varCont =
     | Val   of ident * (typ option) * expr
     | Var   of ident * (typ option) * expr
 
-and methode = 
+and methode = (*localisé dans meth_block et meth_expr*)
     | Mblock of meth_block 
     | Mexpr  of meth_expr
 
@@ -28,7 +40,8 @@ and meth_block = {
     mb_override     : bool ;
     mb_type_params  : (param_type list) option ;
     mb_params       : parametre list ;
-    bloc            : bloc ; }
+    bloc            : bloc ; 
+    mb_loc          : loc ;}
 
 and meth_expr = {
     me_name        : ident ;
@@ -36,17 +49,31 @@ and meth_expr = {
     me_type_params : (param_type list) option ;
     me_params      : parametre list ;
     res_type    : typ ;
-    res_expr    : expr; }
+    res_expr    : expr; 
+    me_loc      : loc ; }
 
 and parametre = {
     p_name      : ident ;
-    p_typ         : typ   ; }
+    p_typ       : typ   ; 
+    p_loc       : loc ; }
 
-and param_type_heritage =
+and param_type_heritage = {
+    pth_cont    : param_type_heritageCont ;
+    pth_loc     : loc ; }
+
+and param_type_heritageCont =
     | Hinf of typ (* >: *)
     | Hsup of typ (* <: *)
 
-and param_type = ident * param_type_heritage option
+and param_type = {
+    pt_cont     : param_typeCont ;
+    pt_loc      : loc ; }
+
+and param_typeCont = ident * param_type_heritage option
+
+and param_type_classe = {
+    ptc_cont    : param_type_classeCont ;
+    ptc_loc     : loc ; }
 
 and param_type_classe = 
     | PTCplus   of param_type
@@ -54,8 +81,9 @@ and param_type_classe =
     | PTCrien   of param_type
 
 and typ = {
-    t_name        : ident ;
-    args_type   : arguments_type ; }
+    t_name      : ident ;
+    args_type   : arguments_type ; 
+    t_loc       : loc ; }
 
 and arguments_type = typ list option
 
