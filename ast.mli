@@ -75,7 +75,7 @@ and param_type_classe = {
     ptc_cont    : param_type_classeCont ;
     ptc_loc     : loc ; }
 
-and param_type_classe = 
+and param_type_classeCont = 
     | PTCplus   of param_type
     | PTCmoins  of param_type
     | PTCrien   of param_type
@@ -86,8 +86,8 @@ and typ = {
     t_loc       : loc ; }
 
 and arguments_type = {
-    a_cont          : arguments_typeCont ;
-    a_loc           : loc }
+    at_cont          : arguments_typeCont ;
+    at_loc           : loc }
 and arguments_typeCont = typ list option
 
 and classe_Main = {
@@ -120,8 +120,8 @@ and exprCont =
     | Ebloc     of bloc
 
 and bloc = 
-    { b_cont        : blocCont ;
-      b_loc         : loc }
+    { bl_cont        : blocCont ;
+      bl_loc         : loc }
 and blocCont = instruction list
 and instruction = 
     | Ivar  of var
