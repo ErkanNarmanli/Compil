@@ -37,30 +37,6 @@
         "Main",         MAIN
     ]
 
-    let operators = [
-        "+",            ADD ;
-        "-",            SUB ;
-        "*",            MUL ;
-        "/",            DIV ;
-        "%",            MOD ;
-        ">:",           INF ;
-        "<:",           SUP ;
-        "==",           EQ ;
-        "=",            EQUAL;
-        "!=",           NE ;
-        "<=",           LE ;
-        ">=",           GE ;
-        "<",            LT ;
-        ">",            GT ;
-        "&&",           AND ;
-        "||",           OR;
-        ",",            COMMA;
-        ".",            DOT;
-        ";",            SEMICOLON;
-        ":",            CONS;
-        "!",            NOT
-    ]
-    
     let delimitors = [
         '(',            LPAR;
         ')',            RPAR;
@@ -76,12 +52,6 @@
         with
         | Not_found -> IDENT s  
         | e         -> raise e
-
-    let check_op w =
-        try
-            List.assoc w operators
-        with
-        | Not_found -> raise (Lexing_error "Opérateur inconnu")
 
     let check_del d = 
         try
@@ -104,14 +74,32 @@ rule token = parse
     | "//"                  { short_comment lexbuf }
     | "/*"                  { long_comment lexbuf }
     | '/'                   { DIV }
+    | '+'                   { ADD }
+    | '-'                   { SUB }
     | '*'                   { MUL }
-    | symbol+ as w          { check_op w }
+    | '%'                   { MOD }
+    | ">:"                  { INF }
+    | "<:"                  { SUP }
+    | "=="                  { EQ }
+    | "="                   { EQUAL }
+    | "!="                  { NE } 
+    | "<="                  { LE }
+    | ">="                  { GE } 
+    | "<"                   { LT } 
+    | ">"                   { GT } 
+    | "&&"                  { AND } 
+    | "||"                  { OR }
+    | ","                   { COMMA }
+    | "."                   { DOT }
+    | ";"                   { SEMICOLON }
+    | ":"                   { CONS }
+    | "!"                   { NOT }
     | digit+ as i           { INT (int_of_string i) }
     | ident as s            { check_kw s }
     | '"' (car* as s) '"'   { STRING s } 
     | limits as d           { check_del d }
     | eof                   { EOF }
-    | _                     { assert false } 
+    | _                     { raise (Lexing_error "Caractère inconnu") } 
 
 
 and short_comment = parse
