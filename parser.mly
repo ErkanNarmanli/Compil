@@ -6,14 +6,14 @@
 %}
 
 (* Déclaration des tokens
- * INF et SUP       désignent   >: et <:
- * EQ et NE         désignent   == et !=
+ * INF   et SUP     désignent   >: et <:
+ * EQ    et NE      désignent   == et !=
  * EQREF et NEREF   désignent   ne et eq
  * NOT              désigne     !
  * EQUAL            désigne     =
  * Pour le reste c'est transparent *)
 
-%token <int> INT
+%token <int>    INT
 %token <string> STRING
 %token <string> IDENT
 
@@ -107,77 +107,82 @@ instruction:
  *)
 
 decl:
-    | v = var       { Dvar v }
-    | m = methode   { Dmeth m }
+    | v = var       {{ Dvar v   ; decl_loc  = ($startpos, $endpos) }}
+    | m = methode   {{ Dmeth m  ; m_loc     = ($startpos, $endpos) }}
 ;
 
 var:
     | VAR; id = IDENT; ct = constyp?; EQUAL; e = expr
-        { Var (id, ct, e) }
+        {{ Var (id, ct, e) ; v_loc = ($startpos, $endpos) }}
     | VAL; id = IDENT; ct = constyp?; EQUAL; e = expr
-        { Val (id, ct, e) }
+        {{ Val (id, ct, e) ; v_loc = ($startpos, $endpos) }}
 ;
 
 methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; b = bloc
-                { Mblock {
-                    mb_name = id;
-                    mb_override = o;
-                    mb_type_params = pts;
-                    mb_params = ps;
-                    bloc = b
-                }
-                }
+                {{  m_desc          = Mblock {
+                    mb_name         = id    ;
+                    mb_override     = o     ;
+                    mb_type_params  = pts   ;
+                    mb_params       = ps    ;
+                    bloc            = b
+                } ; m_loc           = ($startpos, $endpos)
+                }}
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; CONS;
         t = typ; EQUAL; e = expr
-                { Mexpr {
-                    me_name = id;
-                    me_override = o;
-                    me_type_params = pts;
-                    me_params = ps;
-                    res_type = t;
-                    res_expr = e
-                }
+                {{  m_desc          = Mexpr {
+                    me_name         = id    ;
+                    me_override     = o     ;
+                    me_type_params  = pts   ;
+                    me_params       = ps    ;
+                    res_type        = t     ;
+                    res_expr        = e
+                } ; m_loc           = ($startpos, $endpos)
                 }
 ;
 
 typ:
     id = IDENT; argst = arguments_type
-        {{t_name = id;
-        args_type = argst }} 
+        {{  t_name      = id    ;
+            args_type   = argst ;
+            t_loc       = ($startpos, $endpos)}} 
 ;
 
 arguments_type:
     ts = typ_l?
-        { ts }
+        {{ at_cont = ts ; ac_loc = ($startpos, $endpos) }}
 ;
 
 param_type_classe:
-    | ADD; p = param_type       {PTCplus p}
-    | SUB; p = param_type       {PTCmoins p}
-    | p = param_type            {PTCrien p} 
-;
+    | ADD; p = param_type {{ PTCplus  p ; ptc_loc = ($startpos, $endpos) }}
+    | SUB; p = param_type {{ PTCmoins p ; ptc_loc = ($startpos, $endpos)}}
+    | p = param_type      {{ PTCrien  p ; ptc_loc = ($startpos, $endpos) }} ;
 
 parametre:
-    id = IDENT; CONS; t = typ   {{p_name = id; p_typ = t}}
-;
+    id = IDENT; CONS; t = typ   {{p_name    = id ; 
+                                    p_typ   = t ; 
+                                    p_loc   = ($startpos, $endpos) 
+                                }} ;
 
 param_type:
-    | id = IDENT                { (id, None) }
-    | id = IDENT; INF; t = typ  { (id, Some (Hinf t)) }
-    | id = IDENT; SUP; t = typ  { (id, Some (Hsup t)) } 
-;
+    | id = IDENT                {{ pt_cont = (id, None) ; 
+                                pt_loc = ($startpos, $endpos) }}
+    | id = IDENT; INF; t = typ  {{ pt_cont = (id, Some (Hinf t)) ; 
+                                pt_loc = ($startpos, $endpos) }}
+    | id = IDENT; SUP; t = typ  {{ pt_cont (id, Some (Hsup t)) ; 
+                                pt_loc = ($startpos, $endpos)}} ;
 
 classe:
     CLASS; id = IDENT; ptcs = param_type_classe_l?; ps = param_l?;
     h = heritage? LACC; decls = separated_list(SEMICOLON, decl); RACC
-        {{ c_name = id;
-        type_class_params = ptcs;
-        params = ps;
-        deriv = h;
-        decls = decls }}
+        {{ c_name           = id;
+        type_class_params   = ptcs;
+        params              = ps;
+        deriv               = h;
+        decls               = decls ;
+        c_loc               = ($startpos, $endpos)}}
 ;
 
 expr:
