@@ -85,11 +85,20 @@ and typ = {
     args_type   : arguments_type ; 
     t_loc       : loc ; }
 
-and arguments_type = typ list option
+and arguments_type = {
+    a_cont          : arguments_typeCont ;
+    a_loc           : loc }
+and arguments_typeCont = typ list option
 
-and classe_Main = decl list
+and classe_Main = {
+    cM_cont         : classe_MainCont ;
+    cM_loc          : loc }
+and classe_MainCont = decl list
 
-and expr =
+and expr = {
+    e_cont          : exprCont ;
+    e_loc           : loc }
+and exprCont =
     | Evoid
     | Ethis
     | Enull
@@ -110,16 +119,24 @@ and expr =
     | Eprint    of expr
     | Ebloc     of bloc
 
-and bloc = instruction list
-
+and bloc = 
+    { b_cont        : blocCont ;
+      b_loc         : loc }
+and blocCont = instruction list
 and instruction = 
     | Ivar  of var
     | Iexpr of expr
 
-and binop = EqRef | NeRef | Eq | Ne | Lt | Le | Gt | Ge | Add | Sub | Mul | Div | Mod | And | Or
+and binop = 
+    { b_cont        : binopCont ;
+      b_loc         : loc }
+and binopCont = EqRef | NeRef | Eq | Ne | Lt | Le | Gt | Ge | Add | Sub | Mul | Div | Mod | And | Or
 (* EqRef = eq ; NeRef = ne ; Eq = == ; Ne = != *)
 
 and acces = 
+    { a_cont        : accesCont ;
+      a_loc         : loc }
+and accesCont = 
     | Aident        of ident
     | Aexpr_ident   of expr * ident
 
