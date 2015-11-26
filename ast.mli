@@ -31,7 +31,11 @@ and varCont =
     | Val   of ident * (typ option) * expr
     | Var   of ident * (typ option) * expr
 
-and methode = (*localisé dans meth_block et meth_expr*)
+and methode = {
+    m_desc  : methodeCont ;
+    m_loc   : loc ; }
+
+and methodeCont = (*localisé dans meth_block et meth_expr*)
     | Mblock of meth_block 
     | Mexpr  of meth_expr
 
@@ -40,8 +44,7 @@ and meth_block = {
     mb_override     : bool ;
     mb_type_params  : (param_type list) option ;
     mb_params       : parametre list ;
-    bloc            : bloc ; 
-    mb_loc          : loc ;}
+    bloc            : bloc ; }
 
 and meth_expr = {
     me_name        : ident ;
@@ -49,8 +52,7 @@ and meth_expr = {
     me_type_params : (param_type list) option ;
     me_params      : parametre list ;
     res_type    : typ ;
-    res_expr    : expr; 
-    me_loc      : loc ; }
+    res_expr    : expr; }
 
 and parametre = {
     p_name      : ident ;
@@ -122,7 +124,9 @@ and exprCont =
 and bloc = 
     { bl_cont        : blocCont ;
       bl_loc         : loc }
+
 and blocCont = instruction list
+
 and instruction = 
     | Ivar  of var
     | Iexpr of expr
@@ -130,12 +134,14 @@ and instruction =
 and binop = 
     { b_cont        : binopCont ;
       b_loc         : loc }
+
 and binopCont = EqRef | NeRef | Eq | Ne | Lt | Le | Gt | Ge | Add | Sub | Mul | Div | Mod | And | Or
 (* EqRef = eq ; NeRef = ne ; Eq = == ; Ne = != *)
 
 and acces = 
     { a_cont        : accesCont ;
       a_loc         : loc }
+
 and accesCont = 
     | Aident        of ident
     | Aexpr_ident   of expr * ident
