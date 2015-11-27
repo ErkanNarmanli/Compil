@@ -47,12 +47,12 @@ and meth_block = {
     bloc            : bloc ; }
 
 and meth_expr = {
-    me_name        : ident ;
-    me_override    : bool ;
-    me_type_params : (param_type list) option ;
-    me_params      : parametre list ;
-    res_type    : typ ;
-    res_expr    : expr; }
+    me_name         : ident ;
+    me_override     : bool ;
+    me_type_params  : (param_type list) option ;
+    me_params       : parametre list ;
+    res_type        : typ ;
+    res_expr        : expr; }
 
 and parametre = {
     p_name      : ident ;

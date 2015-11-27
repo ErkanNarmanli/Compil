@@ -67,6 +67,12 @@
           | c :: l ->   result.[i] <- c; imp (i + 1) l in
                         imp 0 l
 
+    let check_size_int s =
+            let i = int_of_string s
+            in  if ((i <= 2147483648 - 1) && (i >= -2147483648))
+                then INT i
+                else raise (Lexing_error "Entier trop grand")
+
 }
 
     let digit   = ['0' - '9']
@@ -83,7 +89,7 @@ rule token = parse
     | [' ' '\t']+           { token lexbuf }
     | ['\n' '\r']           { newline lexbuf; token lexbuf }
     | '"'                   { lex_chaine "" lexbuf } 
-    | entier as i           { INT (int_of_string i) }
+    | entier as i           { check_size_int i }
     | ident as s            { check_kw s }
     | limits as d           { check_del d }
     | "//"                  { short_comment lexbuf }
