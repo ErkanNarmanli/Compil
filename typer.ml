@@ -1,10 +1,12 @@
 type typ =
-    | Any
-    | AnyVal
-    | Boolean
-    | Int
-    | Unit
-    | AnyRef
-    | String
-    | Null
-    | Nothing
+    | Tany
+    | TanyVal
+    | Tboolean
+    | Tint
+    | Tunit
+    | TanyRef
+    | Tstring
+    | Tnull
+    | Tnothing
+    | Tclasse of typ list
+    | Tmethode of typ list * typ
