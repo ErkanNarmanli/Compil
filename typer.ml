@@ -17,14 +17,17 @@ type typ =
     | Tvar of tvar
     | Tclasse of tclasse
     | Tmethode of typ list * typ
+
 (* Un type pour les variables *)
 and tvar = {
     id              : int ;
     mutable v_def   : typ option }
+
 (* Un type pour les classes *)
 and tclasse = {
     name            : string ;
     mutable c_def   : typ list }
+
 (* Une structure pour comparer les variables *) 
 module V = struct
     type t = tvar
@@ -35,6 +38,7 @@ module V = struct
                                 {id     = !r ;
                                 v_def   = None }
 end
+
 (* Une structure pour comparer les classes *)
 module C = struct
     type t = tclasse
@@ -53,5 +57,8 @@ module Cset = Set.Make(C)
 
 type env = {
     classes     : Cset.t ;
-    contraites  :  
+    (* contraites  : TODO *) 
     variables   : tvar list}
+
+(* Typage à proprement parler *)
+
