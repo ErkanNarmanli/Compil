@@ -1,6 +1,13 @@
 (* Arbre de syntaxe abstraite décoré de Mini-Scala*)
 
-type typ =
+(*ON DÉFINIT DES OBJETS QUI SERONT UTILES PLUS TARD*)
+type loc    = Lexing.position * Lexing.position (* début, fin *)
+type ident  = string
+
+(* Un map indexé par des chaines de caractères *)
+module Smap = Map.Make(String)
+
+type typerType =
     | Tany
     | TanyVal
     | Tboolean
@@ -10,32 +17,20 @@ type typ =
     | Tstring
     | Tnull
     | Tnothing
-    | Tmethode of typ list * typ
+    | Tclasse of tclasse
+ (* | Tmethode of typ list * typ ... On a besoin de ça ? *)
 
-
-(* Un map indexé par des chaines de caractères *)
-module Smap = Map.Make(String)
-
-(* Le type des contraintes >: *)
-type constr = string * typ
-
-(* Et un ensemble de contraintes *)
-module Cset = Set.Make(
-    struct 
-        let compare = Pervasives.compare
-        type t = constr
-    end
-)
-
-
-(*ON DÉFINIT DES OBJETS QUI SERONT UTILES PLUS TARD*)
-type loc    = Lexing.position * Lexing.position (* début, fin *)
-type ident  = string
+    (* Le type des contraintes >: *)
+and constr = string * typerType
 
 (* env (= environnement local) est un ensemble de classes,
  *  et un ensemble de de contraintes de type,    
  *  et une suite ordonée de déclarations de variables *)
-type context = tclasse Smap.t * Cset.t * tvar list
+and context = {
+    classes     : tclasse Smap.t;
+    constrs     : constr list; 
+    vars        : tvar list
+}
 
 (*ON DÉFINIT L'ARBRE À PROPREMENT PARLER*)
 and tfichier = {
@@ -60,7 +55,7 @@ and tdecl =
 and tvar = {
     tv_cont     : tvarCont  ;
     tv_loc      : loc       ;
-    tv_typ      : typ       ; }
+    tv_typ      : typerType       ; }
 
 and tvarCont = 
     | TVal  of ident * (ttyp option) * texpr
@@ -70,7 +65,7 @@ and tmethode = {
     tm_cont     : tmethodeCont  ;
     tm_loc      : loc           ; (* Plutôt juste la localisation du
                                    * nom de la methode, idéalement *)
-    tm_typ      : typ           ; (* Ouais, hein ? Je sais plus, laissons dans
+    tm_typ      : typerType           ; (* Ouais, hein ? Je sais plus, laissons dans
                                    * le doute *)
     tm_env      : context        ; }
 
@@ -136,7 +131,7 @@ and tclasse_MainCont = tdecl list
 and texpr = {
     te_cont     : texprCont ;
     te_loc      : loc       ;
-    te_typ      : typ       ; }
+    te_typ      : typerType       ; }
                                
 and texprCont = 
     | TEvoid
@@ -175,8 +170,9 @@ Div | Mod | And | Or
 and tacces = {
     ta_cont     : taccesCont    ;
     ta_loc      : loc           ;
-    ta_typ      : typ           ; } (* On type, non ? *)
+    ta_typ      : typerType           ; } (* On type, non ? *)
 
 and taccesCont = 
     | TAident       of ident
     | TAexpr_ident of texpr * ident
+
