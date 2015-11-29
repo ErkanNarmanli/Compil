@@ -18,8 +18,8 @@ type typ =
     | Tnothing
     | Tmethode of typ list * typ
 
-(* Un ensemble de classes *)
-module Cmap = Map.Make(String)
+(* Un map indexé par des chaines de caractères *)
+module Smap = Map.Make(String)
 
 (* Le type des contraintes >: *)
 type constr = string * typ
@@ -30,24 +30,24 @@ module Cset = Set.Make(constr)
 (* env (= environnement local) est un ensemble de classes,
  *  et un ensemble de de contraintes de type,    
  *  et une suite ordonée de déclarations de variables *)
-type context = Cmap.t * Cset.t * var list
-let empty_context = Cmap.empty * Cset.empty * []
+type context = classe Smap.t * Cset.t * var list
+let empty_context = Smap.empty * Cset.empty * []
 
 (*ON DÉFINIT L'ARBRE À PROPREMENT PARLER*)
 type tfichier = {
     tclasses    : tclasse list ;
     tmain       : tclasse_Main ;
-    tf_loc      : loc ; }
+    tf_loc      : loc ; 
+    tf_env      : context}
 
 and tclasse = {
     tc_name             : indent ;
-    ttype_class_params  : (param_type_classe list) option ; (*débile ?!*)
+    ttype_class_params  : (tparam_type_classe list) option ; (*débile ?!*)
     tparams             : (tparametre list) option ; (*débile ?!*)
-    tderiv              : (tttyp * texpr list option ) option ;
+    tderiv              : (ttyp * texpr list option ) option ;
     tdecls              : tdecl list ;
     tc_loc              : loc ; 
     tc_env              : context ; }
-    (*TODO : les classes ont pas de type, hein ?*)
 
 and tdecl = 
     | TDvar     of tvar     
@@ -59,14 +59,15 @@ and tvar = {
     tv_typ      : typ       ; }
 
 and tvarCont = 
-    | TVal  of indent * (tttyp option) * texpr
-    | TVar  of indent * (tttyp option) * texpr
+    | TVal  of indent * (ttyp option) * texpr
+    | TVar  of indent * (ttyp option) * texpr
 
 and tmethode = {
     tm_cont     : tmethodeCont  ;
     tm_loc      : loc           ; (* Plutôt juste la localisation du
                                    * nom de la methode, idéalement *)
-    tm_typ      : typ           ; (*Ouais, hein ?*)
+    tm_typ      : typ           ; (* Ouais, hein ? Je sais plus, laissons dans
+                                   * le doute *)
     tm_env      : contex        ; }
 
 and tmethodeCont = 
@@ -76,23 +77,41 @@ and tmethodeCont =
 and tmeth_bloc = {
     tmb_name            : ident ;
     tmb_override        : bool  ;
-    tmb_type_params     : (param_type list) option ;
-    tmb_params          : parametre list ;
+    tmb_type_params     : (tparam_type list) option ;
+    tmb_params          : tparametre list ;
     tbloc               : tbloc ; }
 
 and tmeh_expr = {
     tme_name            : ident ;
     tme_override        : bool ;
-    tme_type_params     : (param_type list) option ;
-    tme_params          : parametre list ;
+    tme_type_params     : (tparam_type list) option ;
+    tme_params          : tparametre list ;
     tres_type           : ttyp ;
     tres_expr           : texpr ; }
 
+and tparametre = {
+    tp_name             : ident ; 
+    tp_typ              : ttyp ;
+    tp_loc              : loc }
 
-    
-(* On ne refefinit pas parametre *)
-(* On ne redéfinit pas param_type_heritage *)
-(* On ne redéfinit pas param_type *)
+and tparam_type_heritage = 
+    | HTinf of ttyp (* >: *)
+    | HTsup of ttyp (* <: *)
+
+and tparam_type = {
+    tpt_cont            : tparam_typeCont ;
+    tpt_loc             : loc }
+
+and tparam_typeCont = ident * tparam_type_heritage option
+
+and ttyp = {
+    tt_name             : ident ;
+    targs_type          : targuments_type ;
+    tt_loc              : loc }
+
+and targuments_type = {
+    tat_
+
 (* On ne redéfinit pas param_type_classe *)
 (* On ne redéfinit pas typ *)
 (* On ne reféfinit pas arguments_type *)
