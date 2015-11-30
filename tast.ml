@@ -1,3 +1,6 @@
+
+open Ast
+
 (* Arbre de syntaxe abstraite décoré de Mini-Scala*)
 
 (*ON DÉFINIT DES OBJETS QUI SERONT UTILES PLUS TARD*)
@@ -17,7 +20,7 @@ type typerType =
     | Tstring
     | Tnull
     | Tnothing
-    | Tclasse of tclasse
+    | Tclasse of ident * typerType list
  (* | Tmethode of typ list * typ ... On a besoin de ça ? *)
 
     (* Le type des contraintes >: *)
@@ -58,15 +61,15 @@ and tvar = {
     tv_typ      : typerType       ; }
 
 and tvarCont = 
-    | TVal  of ident * (ttyp option) * texpr
-    | TVar  of ident * (ttyp option) * texpr
+    | TVal  of ident * ttyp * texpr
+    | TVar  of ident * ttyp * texpr
 
 and tmethode = {
     tm_cont     : tmethodeCont  ;
     tm_loc      : loc           ; (* Plutôt juste la localisation du
                                    * nom de la methode, idéalement *)
-    tm_typ      : typerType           ; (* Ouais, hein ? Je sais plus, laissons dans
-                                   * le doute *)
+    tm_typ      : typerType           ; (* Ouais, hein ? Ouais, j'en ai besoin à
+                                        un endroit*)
     tm_env      : context        ; }
 
 and tmethodeCont = 
@@ -112,9 +115,9 @@ and tparam_type_classeCont =
     | TPTCrien  of tparam_type
 
 and ttyp = {
-    tt_name             : ident ;
-    targs_type          : targuments_type ;
-    tt_loc              : loc }
+    tt_typ          : typerType;
+    tt_loc          : loc
+}
 
 and targuments_type = {
     tat_cont            : targuments_typeCont ;
@@ -170,9 +173,24 @@ Div | Mod | And | Or
 and tacces = {
     ta_cont     : taccesCont    ;
     ta_loc      : loc           ;
-    ta_typ      : typerType           ; } (* On type, non ? *)
+ (* ta_typ      : typerType           ; }  On type, non ? Non *)
+}
 
 and taccesCont = 
-    | TAident       of ident
+    | TAident      of ident
     | TAexpr_ident of texpr * ident
+
+(* Des accesseurs parce que yen a marre de faire des matchs dans tous les sens *)
+let get_var_id tv = match tv.tv_cont with
+    | TVal (id, _, _)   -> id
+    | TVar (id, _, _)   -> id
+
+let get_meth_id m = match m.tm_cont with
+    | TMbloc tmb -> tmb.tmb_name
+    | TMexpr tme -> tme.tme_name
+
+let tacces_of_acces a = match a.a_cont with
+    | Aident i ->           { ta_cont = TAident i; ta_loc = a.a_loc}
+    | Aexpr_ident (e,i) ->  assert false
+
 
