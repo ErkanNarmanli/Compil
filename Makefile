@@ -27,7 +27,7 @@ ppast.ml: ast.cmi
 
 clean:
 	rm *.cmi *.cmo
-	rm main typer
+	rm main
 	rm $(GENERATED)
 
 .depend depend: $(GENERATED)
