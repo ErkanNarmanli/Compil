@@ -1,4 +1,4 @@
-CMO=ppast.cmo lexer.cmo parser.cmo main.cmo
+CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo typer.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=main
 
@@ -23,7 +23,6 @@ $(BIN): $(CMO)
 	menhir --infer -v $<
 
 parser.ml: ast.cmi
-ppast.ml: ast.cmi
 
 clean:
 	rm *.cmi *.cmo
