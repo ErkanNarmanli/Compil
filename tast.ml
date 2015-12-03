@@ -1,4 +1,4 @@
-
+(* TODO : RELIRE TOUT LE TAST *)
 open Ast
 
 (* Arbre de syntaxe abstraite décoré de Mini-Scala*)
@@ -20,17 +20,16 @@ type typerType =
     | Tstring
     | Tnull
     | Tnothing
-    | Tclasse of ident * typerType list
- (* | Tmethode of typ list * typ ... On a besoin de ça ? *)
+    | Tclasse of tclasse * targuments_type
 
-    (* Le type des contraintes >: *)
+(* Le type des contraintes >: *)
 and constr = string * typerType
 
 (* env (= environnement local) est un ensemble de classes,
  *  et un ensemble de de contraintes de type,    
  *  et une suite ordonée de déclarations de variables *)
 and context = {
-    classes     : tclasse Smap.t;
+    classes     : tclasse list;
     constrs     : constr list; 
     vars        : tvar list
 }
@@ -57,8 +56,8 @@ and tdecl =
 
 and tvar = {
     tv_cont     : tvarCont  ;
-    tv_loc      : loc       ;
-    tv_typ      : typerType       ; }
+    tv_typ      : typerType ;
+    tv_loc      : loc }
 
 and tvarCont = 
     | TVal  of ident * ttyp * texpr
@@ -68,8 +67,6 @@ and tmethode = {
     tm_cont     : tmethodeCont  ;
     tm_loc      : loc           ; (* Plutôt juste la localisation du
                                    * nom de la methode, idéalement *)
-    tm_typ      : typerType           ; (* Ouais, hein ? Ouais, j'en ai besoin à
-                                        un endroit*)
     tm_env      : context        ; }
 
 and tmethodeCont = 
@@ -86,14 +83,13 @@ and tmeth_bloc = {
 and tmeth_expr = {
     tme_name            : ident ;
     tme_override        : bool ;
-    tme_type_params     : (tparam_type list) option ;
+    tme_type_params     : tparam_type list ;
     tme_params          : tparametre list ;
     tres_type           : ttyp ;
     tres_expr           : texpr ; }
 
 and tparametre = {
     tp_name             : ident ; 
-    tp_typ              : ttyp ;
     tp_loc              : loc }
 
 and tparam_type_heritage = 
@@ -115,13 +111,13 @@ and tparam_type_classeCont =
     | TPTCrien  of tparam_type
 
 and ttyp = {
-    tt_typ          : typerType;
-    tt_loc          : loc
-}
+    tt_name         : ident;
+    targs_type      : targuments_type ;
+    tt_loc          : loc }
 
 and targuments_type = {
     tat_cont            : targuments_typeCont ;
-    tat_col             : loc }
+    tat_loc             : loc }
 
 and targuments_typeCont = ttyp list
 
@@ -164,16 +160,12 @@ and tinstruction =
     | TIexpr    of texpr
 
 and tbinop = {
-    tb_cont             : tbinopCont ;
+    tb_cont             : binopCont ;
     tb_loc              : loc }
-
-and tbinopCont = EqRef | NeRef | Eq | Ne | Lt | Le | Gt | Ge | Add | Sub | Mul |
-Div | Mod | And | Or
 
 and tacces = {
     ta_cont     : taccesCont    ;
     ta_loc      : loc           ;
- (* ta_typ      : typerType           ; }  On type, non ? Non *)
 }
 
 and taccesCont = 
@@ -193,4 +185,37 @@ let tacces_of_acces a = match a.a_cont with
     | Aident i ->           { ta_cont = TAident i; ta_loc = a.a_loc}
     | Aexpr_ident (e,i) ->  assert false
 
+let rec ttyp_of_typ t = 
+  {
+    tt_name     = t.t_name;
+    targs_type = targst_of_argst t.args_type;
+    tt_loc      = t.t_loc
+  }
+
+and targst_of_argst argst = 
+  {
+    tat_cont = begin match argst.at_cont with
+        | None   -> []
+        | Some l -> List.map ttyp_of_typ l 
+      end;
+    tat_loc = argst.at_loc
+  }
+
+
+let tbinop_of_binop b =
+    { tb_cont = b.b_cont ; tb_loc = b.b_loc }
+
+let get_acces_id a = match a.a_cont with
+    | Aident i ->           i
+    | Aexpr_ident (e, i) -> i       
+
+let get_decl_ttyp = function
+    | TDvar v ->    begin match v.tv_cont with
+                        | TVal (_, t, _) ->     t
+                        | TVar (_, t, _) ->     t
+                    end
+    | TDmeth m ->   assert false  
+
+(* tparam_type_classe -> ident *)
+let get_ptc_id p = assert false
 
