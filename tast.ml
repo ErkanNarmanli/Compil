@@ -45,7 +45,7 @@ and tclasse = {
     tc_name             : ident ;
     ttype_class_params  : tparam_type_classe list;
     tparams             : tparametre list ; 
-    tderiv              : (ttyp * texpr list) option ;
+    tderiv              : (typerType * texpr list) option ;
     tdecls              : tdecl list ;
     tc_loc              : loc ; 
     tc_env              : context ; }
@@ -60,8 +60,8 @@ and tvar = {
     tv_loc      : loc }
 
 and tvarCont = 
-    | TVal  of ident * ttyp * texpr
-    | TVar  of ident * ttyp * texpr
+    | TVal  of ident * typerType * texpr
+    | TVar  of ident * typerType * texpr
 
 and tmethode = {
     tm_cont     : tmethodeCont  ;
@@ -76,7 +76,7 @@ and tmethodeCont =
 and tmeth_bloc = {
     tmb_name            : ident ;
     tmb_override        : bool  ;
-    tmb_type_params     : (tparam_type list) option ;
+    tmb_type_params     : tparam_type list ;
     tmb_params          : tparametre list ;
     tbloc               : tbloc ; }
 
@@ -85,16 +85,17 @@ and tmeth_expr = {
     tme_override        : bool ;
     tme_type_params     : tparam_type list ;
     tme_params          : tparametre list ;
-    tres_type           : ttyp ;
+    tres_type           : typerType ;
     tres_expr           : texpr ; }
 
 and tparametre = {
     tp_name             : ident ; 
+    tp_typ              : typerType;
     tp_loc              : loc }
 
 and tparam_type_heritage = 
-    | HTinf of ttyp (* >: *)
-    | HTsup of ttyp (* <: *)
+    | HTinf of typerType (* >: *)
+    | HTsup of typerType (* <: *)
 
 and tparam_type = {
     tpt_cont            : tparam_typeCont ;
@@ -110,21 +111,16 @@ and tparam_type_classeCont =
     | TPTCmoins of tparam_type
     | TPTCrien  of tparam_type
 
-and ttyp = {
-    tt_name         : ident;
-    targs_type      : targuments_type ;
-    tt_loc          : loc }
-
 and targuments_type = {
     tat_cont            : targuments_typeCont ;
     tat_loc             : loc }
 
-and targuments_typeCont = ttyp list
+and targuments_typeCont = typerType list
 
 and tclasse_Main = {
     tcM_cont    : tclasse_MainCont  ;
     tcM_loc     : loc               ; } (* idem juste la loc du mot clef
-                                        * 'class Main', c'est mieux *)
+                                         * 'class Main', c'est mieux *)
 and tclasse_MainCont = tdecl list
 
 and texpr = {
@@ -185,23 +181,6 @@ let tacces_of_acces a = match a.a_cont with
     | Aident i ->           { ta_cont = TAident i; ta_loc = a.a_loc}
     | Aexpr_ident (e,i) ->  assert false
 
-let rec ttyp_of_typ t = 
-  {
-    tt_name     = t.t_name;
-    targs_type = targst_of_argst t.args_type;
-    tt_loc      = t.t_loc
-  }
-
-and targst_of_argst argst = 
-  {
-    tat_cont = begin match argst.at_cont with
-        | None   -> []
-        | Some l -> List.map ttyp_of_typ l 
-      end;
-    tat_loc = argst.at_loc
-  }
-
-
 let tbinop_of_binop b =
     { tb_cont = b.b_cont ; tb_loc = b.b_loc }
 
@@ -209,7 +188,7 @@ let get_acces_id a = match a.a_cont with
     | Aident i ->           i
     | Aexpr_ident (e, i) -> i       
 
-let get_decl_ttyp = function
+let get_decl_typ = function
     | TDvar v ->    begin match v.tv_cont with
                         | TVal (_, t, _) ->     t
                         | TVar (_, t, _) ->     t
@@ -218,4 +197,42 @@ let get_decl_ttyp = function
 
 (* tparam_type_classe -> ident *)
 let get_ptc_id p = assert false
+
+(* tmethode -> tparams *)
+let get_meth_params m = match m.tm_cont with 
+  | TMbloc tmb -> tmb.tmb_params
+  | TMexpr tme -> tme.tme_params
+
+(* tmethode -> typerType *)
+let get_meth_type m = match m.tm_cont with
+  | TMbloc _   -> Tunit
+  | TMexpr tme -> tme.tres_type
+
+(* tmethode -> ident list *)
+let get_meth_type_params_id_list m = match m.tm_cont with
+  | TMbloc tmb -> List.map (fun tpt -> fst tpt.tpt_cont) tmb.tmb_type_params
+  | TMexpr tme -> List.map (fun tpt -> fst tpt.tpt_cont) tme.tme_type_params
+
+(* tclasse -> tparam_type_heritage option list *)
+let get_bornes_list_c c =
+  let rec aux = function
+    | []      -> []
+    | tptc::q -> begin match tptc.tptc_cont with
+                   | TPTCplus tpt  -> snd tpt.tpt_cont
+                   | TPTCmoins tpt -> snd tpt.tpt_cont
+                   | TPTCrien tpt  -> snd tpt.tpt_cont
+                 end :: (aux q) in
+  aux c.ttype_class_params 
+
+(* tmethode -> tparam_type_heritage option list *)
+let get_bornes_list_m m =
+  let rec aux = function
+      | []     -> []
+      | tpt::q -> (snd tpt.tpt_cont) :: (aux q)
+  in aux (match m.tm_cont with
+    | TMbloc tmb -> tmb.tmb_type_params
+    | TMexpr tme -> tme.tme_type_params
+  ) 
+
+
 

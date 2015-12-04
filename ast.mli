@@ -86,7 +86,7 @@ and typ = {
 and arguments_type = {
     at_cont          : arguments_typeCont ;
     at_loc           : loc }
-and arguments_typeCont = typ list option
+and arguments_typeCont = (typ list) option
 
 and classe_Main = {
     cM_cont         : classe_MainCont ;
