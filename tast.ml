@@ -7,9 +7,6 @@ open Ast
 type loc    = Lexing.position * Lexing.position (* début, fin *)
 type ident  = string
 
-(* Un map indexé par des chaines de caractères *)
-module Smap = Map.Make(String)
-
 type typerType =
     | Tany
     | TanyVal
@@ -31,7 +28,8 @@ and constr = string * typerType
 and context = {
     classes     : tclasse list;
     constrs     : constr list; 
-    vars        : tvar list
+    vars        : tvar list;
+    meths       : tmethode list
 }
 
 (*ON DÉFINIT L'ARBRE À PROPREMENT PARLER*)
@@ -198,6 +196,11 @@ let get_decl_typ = function
 (* tparam_type_classe -> ident *)
 let get_ptc_id p = assert false
 
+(* tmethode -> ident *)
+let get_meth_id m = match m.tm_cont with
+  | TMbloc tmb  -> tmb.tmb_name
+  | TMexpr tme  -> tme.tme_name
+
 (* tmethode -> tparams *)
 let get_meth_params m = match m.tm_cont with 
   | TMbloc tmb -> tmb.tmb_params
@@ -218,9 +221,9 @@ let get_bornes_list_c c =
   let rec aux = function
     | []      -> []
     | tptc::q -> begin match tptc.tptc_cont with
-                   | TPTCplus tpt  -> snd tpt.tpt_cont
-                   | TPTCmoins tpt -> snd tpt.tpt_cont
-                   | TPTCrien tpt  -> snd tpt.tpt_cont
+                   | TPTCplus tpt  -> (snd tpt.tpt_cont, tpt.tpt_loc) 
+                   | TPTCmoins tpt -> (snd tpt.tpt_cont, tpt.tpt_loc) 
+                   | TPTCrien tpt  -> (snd tpt.tpt_cont, tpt.tpt_loc) 
                  end :: (aux q) in
   aux c.ttype_class_params 
 
@@ -228,11 +231,38 @@ let get_bornes_list_c c =
 let get_bornes_list_m m =
   let rec aux = function
       | []     -> []
-      | tpt::q -> (snd tpt.tpt_cont) :: (aux q)
+      | tpt::q -> (snd tpt.tpt_cont, tpt.tpt_loc) :: (aux q)
   in aux (match m.tm_cont with
     | TMbloc tmb -> tmb.tmb_type_params
     | TMexpr tme -> tme.tme_type_params
   ) 
+
+(* tparam_type_classe -> ident *)
+let get_tptc_id tptc = match tptc.tptc_cont with
+  | TPTCplus  tpt -> fst tpt.tpt_cont
+  | TPTCmoins tpt -> fst tpt.tpt_cont
+  | TPTCrien  tpt -> fst tpt.tpt_cont
+
+(* tparam_type_classe list -> ident list *)
+let rec get_tptc_id_list = List.map get_tptc_id
+
+(* Un accesseur pour l'ast ...
+ * param_type_classe -> param_type_heritage option *)
+let get_ptc_borne ptc = match ptc.ptc_cont with
+  | PTCplus  pt ->  snd pt.pt_cont
+  | PTCmoins pt ->  snd pt.pt_cont
+  | PTCrien  pt ->  snd pt.pt_cont
+
+let get_ptc_borne_list c = match c.type_class_params with
+  | None -> []
+  | Some l -> List.map get_ptc_borne l
+ 
+(* Un accesseur pour l'ast ...
+ * param_type_classe -> ident *)
+let get_ptc_id ptc = match ptc.ptc_cont with
+  | PTCplus  pt ->  fst pt.pt_cont
+  | PTCmoins pt ->  fst pt.pt_cont
+  | PTCrien  pt ->  fst pt.pt_cont
 
 
 

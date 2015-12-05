@@ -5,14 +5,42 @@ exception TypeError of loc * string
 
 (* Fonctions utiles *)
 
+let rec iter3 f l1 l2 l3 = match (l1, l2, l3) with
+  | ([], [], []) -> ()
+  | (t1::q1, t2::q2, t3::q3) ->
+      f t1 t2 t3;
+      iter3 f q1 q2 q3
+  | _ -> raise (Invalid_argument "Tailles incompatibles dans iter3") 
+
 (* Ajoute une variable à un environnement *)
 (* env -> tvar -> env *)
 let add_tvar_env env tv = 
     {
         classes = env.classes ;
         constrs = env.constrs ;
-        vars    = tv::env.vars
+        vars    = tv::env.vars;
+        meths   = env.meths 
     }
+
+(* Ajoute une classe a un environnement
+ * context -> tclasse -> context *)
+let add_classe_env env c = 
+  {
+    classes = c::env.classes;
+    constrs = env.constrs ; 
+    vars    = env.vars;
+    meths   = env.meths
+  }
+
+(* Ajoute une contrainte a un environnement
+ * context -> (ident * typerTyper) -> context *)
+let add_constr_env env constr = 
+  {
+    classes = env.classes;
+    constrs = constr::env.constrs;
+    vars    = env.vars;
+    meths   = env.meths
+  }
 
 (* Affichage d'un type *)
 let rec string_of_typ = function
@@ -34,11 +62,6 @@ and string_of_class i targst =
   List.fold_left (fun s t -> s^(string_of_typ t)^", ") "" targst.tat_cont
   )^"]"
 
-(* fonction de substitution
- * subst : tclasse -> targuments_type -> typerType -> typerType *)
-let rec subst c targst t =
-  assert false
-
 (* chercher une classe dans l'environnement env *)
 let classe_lookup env id = 
   let rec aux = function
@@ -48,6 +71,32 @@ let classe_lookup env id =
                  else
                    aux q
   in aux env.classes
+
+(* fonction de substitution
+ * subst : contex -> tclasse -> targuments_type -> typerType -> typerType *)
+let subst env c targst t = 
+  let assoc = (List.combine (get_tptc_id_list c.ttype_class_params) 
+                            targst.tat_cont)
+  in
+  let rec aux = function
+    | Tclasse (c', targst') ->
+        begin try 
+            List.assoc c'.tc_name assoc
+        with 
+          | Not_found ->
+            begin try
+                let _ = classe_lookup env c'.tc_name in
+                Tclasse (c', {
+                              tat_cont = List.map aux targst'.tat_cont ; 
+                              tat_loc  = targst'.tat_loc
+                              })              
+            with
+              | Not_found -> raise (TypeError (c'.tc_loc, "Classe inconnue :
+                  \""^c'.tc_name^"\"."))
+            end
+        end
+    | t -> t 
+  in aux t
 
 (* typ -> typerType *)
 let rec typerType_of_typ env t = match t.t_name with
@@ -90,14 +139,12 @@ let rec var_lookup id = function
 let meth_lookup m_id c =
   let rec aux = function 
     | []   -> raise Not_found
-    | d::q -> begin match d with
-                | TDvar v  -> aux q
-                | TDmeth m -> if m_id = (get_meth_id m) then
-                                m
-                              else
-                                aux q
-              end
-  in aux c.tdecls
+    | m::q ->
+        if (get_meth_id m) = m_id then
+          m
+        else
+          aux q
+  in aux c.tc_env.meths
 
 
 let rec decl_lookup id = function
@@ -123,28 +170,112 @@ and decl_type_lookup x = function
                                 d'appeler une méthode de cette façon. Il manque
                                 les arguments"))
               end
-        
+(* Fonction auxiliaire qui vérifie qu'une
+ * classe hérite d'une autre (indirectement) *)
+let herits_from c1 c2 = 
+  let rec herits_from_c2 c = 
+    if c.tc_name = c2.tc_name then
+      true
+    else begin match c.tderiv with
+      | Some (t, _) -> begin match t with
+            | Tclasse (c', targst') -> herits_from_c2 c'
+            | _ -> false
+          end 
+      | None -> false
+    end in herits_from_c2 c1
+    
 (* Sous-typage *)
-let rec is_sstype t1 t2 = 
-    assert false
+let rec is_sstype env t1 t2 = match (t1, t2) with
+  | Tnothing, _             -> true
+  | Tnull,  Tclasse (_, _)  -> true
+  | Tnull, Tstring          -> true 
+  | _, TanyVal              -> t1 = Tint || t1 = Tunit || t1 = Tboolean 
+  | _, Tany                 -> true
+  | _, TanyRef              -> begin match t1 with
+                                 | Tclasse (_, _)   -> true
+                                 | Tstring | Tnull  -> true
+                                 | _                -> false
+                               end
+  | Tclasse (c1, targst1), Tclasse (c2, targst2) ->
+      (* Cas où c1 = c2, on doit vérifier les contraintes sur les paramètres de
+       * type *)
+      if (c1.tc_name = c2.tc_name) then begin
+        let welltyped = ref true in
+        (* typerType list -> typerType list -> tparam_type_classeCont list -> () *)
+        let f t1 t2 = function 
+          | TPTCplus  tpt -> welltyped := !welltyped && (is_sstype env t1 t2)
+          | TPTCrien  tpt -> welltyped := !welltyped && (t1 = t2)
+          | TPTCmoins tpt -> welltyped := !welltyped && (is_sstype env t2 t1)
+        in
+        let ts1   = targst1.tat_cont in
+        let ts2   = targst2.tat_cont in
+        let tptcs = List.map (fun tptc -> tptc.tptc_cont) c1.ttype_class_params
+        in
+        iter3 f ts1 ts2 tptcs;
+        !welltyped
+      (* Cas où c1 <> c2.
+       * On distingue selon si c1 hérite de c2 ou non. *)
+      end else
+        if herits_from c1 c2 then
+          let (c, targst) = begin match c1.tderiv with
+            | Some (Tclasse (c, targst), _) -> (c, targst)
+            | _ -> failwith "On ne peut que trouver une classe ici : herits_from
+                      vient de renvoyer true."
+          end in
+          let targst' = {
+            tat_cont = List.map (subst env c1 targst1) targst.tat_cont;
+            tat_loc = targst.tat_loc
+          } in
+          is_sstype env (Tclasse (c, targst')) t2
+        else
+          is_sstype env t1 (List.assoc c2.tc_name env.constrs)
+  | t1, t2 -> t1 = t2
 
-let max_type t1 t2 = 
-    assert false 
+let max_type env t1 t2 eloc = 
+    if is_sstype env t1 t2 then t2
+        else if is_sstype env t2 t1 then t1
+            else raise (TypeError (eloc, "Les deux types dans cette expression
+            ne sont pas comparables."))
 
-(* Types bien formés *)
-let is_bf env t = 
-    assert false
+(* Respect d'une borne *)
+let check_borne env t (bo, eloc) = match bo with
+  | None    -> None
+  | Some b  ->
+      if (match b with
+        | HTinf t' -> is_sstype env t' t
+        | HTsup t' -> is_sstype env t t'
+      ) then None
+      else (Some eloc)
 
-(* substitution bien formée *)
-let is_subst_bf c targst =
-  assert false
 
 (* Respect des bornes. 
- * typerType list -> tparam_type_heritage option list (i.e. liste de bornes) ->
- *      loc option
- * Rend None en l'absence d'erreur sur les bornes et (Some errloc) sinon où
+ *  context -> typerType list ->
+ *   tparam_type_heritage option list (i.e. liste de bornes) -> loc option
+ * Rend None en l'absence d'erreur sur les bornes et (Some errloc) sinonù
  * errloc est la localisation de la première erreur trouvée *)
-let check_bornes ts bs = assert false
+let check_borne_list env ts bs = 
+  List.fold_left2
+      (fun eloc_o t blo -> begin match eloc_o with
+        | Some eloc' -> Some eloc'
+        | None -> check_borne env t blo
+      end) None ts bs
+  
+
+(* Types bien formés *)
+let rec is_bf env = function
+  | Tclasse (c, targst)  ->
+      begin try 
+        let _ = classe_lookup env c.tc_name in
+        begin match (check_borne_list env targst.tat_cont (get_bornes_list_c c)) with
+          | None   -> List.for_all (is_bf env) targst.tat_cont
+          | Some _ -> false
+        end
+      with
+        | Not_found -> raise (TypeError (c.tc_loc, "Cette instance de classe
+                       n'est pas bien formee."))
+      end
+  | _ -> true
+
 
 (* Typage à proprement parler *)
 
@@ -174,7 +305,7 @@ let rec type_expr env tro e = match e.e_cont with
                           de déterminer à quoi \"this\" fait référence"))
                       end
   | Eacc a      -> begin match a.a_cont with
-                     | Aident id -> (* CACA TODO *)
+                     | Aident id -> 
                          begin try {
                            te_cont = TEacc (tacces_of_acces a);
                            te_loc = e.e_loc;
@@ -213,7 +344,7 @@ let rec type_expr env tro e = match e.e_cont with
                                      ta_loc = a.a_loc
                                    };
                                  te_loc = e.e_loc;
-                                 te_typ = subst c targst t
+                                 te_typ = subst env c targst t
                                }
                            | _ ->  raise (TypeError (e.e_loc, "Cette
                                expression n'est pas une instance d'une classe,
@@ -228,7 +359,7 @@ let rec type_expr env tro e = match e.e_cont with
                                (* on a bien trouvé la variable identifiée
                                 * par i *)
                                let e'' = type_expr env tro e' in
-                               if is_sstype t1 e''.te_typ then
+                               if is_sstype env t1 e''.te_typ then
                                  (* t1 est bien un sous type de t2 *)
                                  {
                                    te_cont = TEacc_exp
@@ -265,7 +396,7 @@ let rec type_expr env tro e = match e.e_cont with
                                  e_loc = a.a_loc
                              } in
                              let e2 = type_expr env tro e' in
-                             if is_sstype e2.te_typ e1.te_typ then
+                             if is_sstype env e2.te_typ e1.te_typ then
                                let a' = begin match e1.te_cont with
                                  | TEacc a'' -> a''
                                  | _         -> failwith "Comment on a fait
@@ -313,8 +444,8 @@ let rec type_expr env tro e = match e.e_cont with
                    * avec ne et eq (chez nous : NeRef et EqRef)
                    * Le résultat est un booléen *)
                   | NeRef | EqRef -> 
-                      if (is_sstype e1'.te_typ TanyRef) &&
-                         (is_sstype e2'.te_typ TanyRef) then {
+                      if (is_sstype env e1'.te_typ TanyRef) &&
+                         (is_sstype env e2'.te_typ TanyRef) then {
                               te_cont = TEbinop ((tbinop_of_binop b),e1',e2');
                               te_loc = e.e_loc;
                               te_typ = Tboolean
@@ -380,11 +511,11 @@ let rec type_expr env tro e = match e.e_cont with
                 (* eb' doit être un booléen
                  * Les types de e1' et e2' doivent être comparables *)
                 if (eb'.te_typ = Tboolean) &&
-                   ((is_sstype e1'.te_typ e2'.te_typ) ||
-                   (is_sstype e2'.te_typ e2'.te_typ))
+                   ((is_sstype env e1'.te_typ e2'.te_typ) ||
+                   (is_sstype env e2'.te_typ e2'.te_typ))
                 then {
                       te_cont = TEifelse (eb', e1', e2');
-                      te_typ = max_type e1'.te_typ e2'.te_typ;
+                      te_typ = max_type env e1'.te_typ e2'.te_typ e.e_loc;
                       te_loc = e.e_loc
                     }
                 else raise (TypeError (e.e_loc, "Le type de retour est mal 
@@ -432,7 +563,7 @@ let rec type_expr env tro e = match e.e_cont with
                    * D'où une fonction de test un peu longue... *)
                   let (welltyped, errloc_o) = begin try (List.fold_left2 (fun (b,o) e' p -> 
                         begin match o with
-                          | None -> let b' = is_sstype e'.te_typ (subst c targst
+                          | None -> let b' = is_sstype env e'.te_typ (subst env c targst
                                     p.tp_typ) in
                                     (b && b', if b' then None else Some
                                     e'.te_loc)
@@ -513,19 +644,9 @@ let rec type_expr env tro e = match e.e_cont with
                                *  la méthode *)
                                   let tau's = List.map (fun p -> p.tp_typ)
                                   (get_meth_params m) in
-                              (* On applique la première substitution *)
-                                  let tau's' = List.map (subst c targst) tau's
-                                  in
-                              (* On vérifie que les bornes sont respectées *)
-                                  begin match check_bornes tau's' (get_bornes_list_c
-                                  c) with
-                                    | None -> ()
-                                    | Some errloc -> raise (TypeError (errloc,
-                                    "La borne de type n'est pas respectée"))
-                                  end;
-                              (* On oublie désormais les positions des types, on
-                               * n'aura plus de problèmes avec *)
-                                  let (taus, _) = List.split loctyps in  
+                              (* On sépare les listes des types et des
+                               * positions *)
+                                  let (taus, tlocs) = List.split loctyps in  
                               (* On calcule la liste des idents des Tj à
                                * substituer par les taus et on zippe les listes
                                * ensemble en une liste d'association *)
@@ -557,20 +678,49 @@ let rec type_expr env tro e = match e.e_cont with
                                         end
                                     | _ as t -> t 
                                   in
-                                  let tau''s = List.map subst' tau's' in
-                                  begin match check_bornes tau''s (get_bornes_list_m
+                                  let tau's' = List.map subst' tau's in
+                                  (* On vérifie les bornes *)
+                                  begin match check_borne_list env tau's' (get_bornes_list_m
                                   m) with
                                     | None -> ()
                                     | Some errloc -> raise (TypeError (errloc,
                                     "La borne de type n'est pas respectée"))
                                   end;
+                              (* On applique la première substitution *)
+                                  let tau''s = List.map (subst env c targst)
+                                  tau's'
+                                  in
+                              (* On vérifie que les bornes sont respectées *)
+                                  begin match check_borne_list env tau''s (get_bornes_list_c
+                                  c) with
+                                    | None -> ()
+                                    | Some errloc -> raise (TypeError (errloc,
+                                    "La borne de type n'est pas respectée"))
+                                  end;
+                                  begin try 
+                                    iter3 (fun t1 t2 eloc ->
+                                        if is_sstype env t1 t2 then
+                                            ()
+                                        else 
+                                            raise (TypeError (eloc, "Les types
+                                            sont incompatibles")))
+                                        (List.map (fun exp -> exp.te_typ) es')
+                                        tau''s tlocs
+                                  with
+                                    | Invalid_argument _ -> raise (TypeError
+                                    (e.e_loc, "Cette méthode n'a pas reçu le bon
+                                    nombre d'arguments."))
+                                  end;
+                                  (* On applique la première substitution au
+                                   * type de retour puis on vérifie les
+                                   * bornes. *)
                                   {
                                     te_cont = TEacc_typ_exp ({
                                       ta_cont = TAexpr_ident(te'', m_id);
                                       ta_loc  = a.a_loc
                                     }, targst_of_argst env argst, es');
-                                    te_typ = subst' ((subst c targst)
-                                      (get_meth_type m)); 
+                                    te_typ = (subst env c targst) (
+                                      subst' (get_meth_type m)); 
                                     te_loc = e.e_loc
                                   }
                               | Some errloc -> raise (TypeError (errloc, "Ce
@@ -583,7 +733,7 @@ let rec type_expr env tro e = match e.e_cont with
 
                       
                 end
-  | Ereturn None -> if is_sstype Tunit (match tro with | None -> failwith "On a oublié
+  | Ereturn None -> if is_sstype env Tunit (match tro with | None -> failwith "On a oublié
                     de mettre le type de retour de la méthode qu'on type dans
                     tro" | Some tr -> tr) then
                       {
@@ -599,7 +749,7 @@ let rec type_expr env tro e = match e.e_cont with
                          oublié de préciser le type de retour de la méthode
                          qu'on type" | Some tr -> tr end in
                          let e'' = type_expr env tro e' in
-                         if is_sstype e''.te_typ tr then
+                         if is_sstype env e''.te_typ tr then
                            {
                              te_cont = TEreturn (Some e'');
                              te_typ = Tnothing;
@@ -660,7 +810,7 @@ let rec type_expr env tro e = match e.e_cont with
                                       else
                                         raise (TypeError (t.t_loc, "Ce type
                                         n'est pas bien formé."));
-                                      if is_sstype ev'.te_typ t' then
+                                      if is_sstype env ev'.te_typ t' then
                                         ()
                                       else
                                         raise (TypeError (t.t_loc, "Le type
@@ -705,6 +855,76 @@ let rec type_expr env tro e = match e.e_cont with
                                     }
                             end
 
+(* context -> param_type_classe -> tparam_type_heritage option -> context *)
+let ptc_add env ptc bo = match bo with
+  | None -> add_classe_env env {
+              tc_name = get_ptc_id ptc;
+              ttype_class_params = [];
+              tparams = [];
+              tderiv = None;
+              tdecls = [];
+              tc_loc = ptc.ptc_loc;
+              tc_env = env (* c'est bien ca ? *)
+      }
+  | Some (Hsup tau) ->
+      let tau' = typerType_of_typ env tau in 
+      if is_bf env tau' then
+        add_classe_env env {
+              tc_name = get_ptc_id ptc;
+              ttype_class_params = [];
+              tparams = [];
+              tderiv = Some (tau', []); (* en est-on bien sur ... *)
+              tdecls = [];
+              tc_loc = ptc.ptc_loc;
+              tc_env = env (* c'est bien ca ? *)
+        }
+      else
+        raise (TypeError (ptc.ptc_loc, "La borne de ce parametre de type n'est
+              pas bien formee"))
+  | Some (Hinf tau) ->
+      let tau' = typerType_of_typ env tau in 
+      if is_bf env tau' then
+        add_constr_env (add_classe_env env {
+              tc_name = get_ptc_id ptc;
+              ttype_class_params = [];
+              tparams = [];
+              tderiv = None; (* en est-on bien sur ... *)
+              tdecls = [];
+              tc_loc = ptc.ptc_loc;
+              tc_env = env (* c'est bien ca ? *)
+        }) (get_ptc_id ptc, tau')
+      else
+        raise (TypeError (ptc.ptc_loc, "La borne de ce parametre de type n'est
+              pas bien formee"))
+      
+              
+let type_classe env c =
+  (* On declare des environnements mutables pour ne pas se perde *)
+  let gamma  = ref env in
+  let gamma' = ref env in
+  (* 1. On checke les parametre de type et on les ajoute a l'env *)
+  gamma' := List.fold_left2 ptc_add !gamma (match c.type_class_params with
+    | None -> []
+    | Some l -> l) (get_ptc_borne_list c);
+  (* TODO : faire sortir du fold la liste de quoi consrtuire les tcpc du point
+   * 2. *)
+  (* 2. On verifie que le type dont on herite est bien forme et on l'ajoute a
+   * l'env *)
+  match c.deriv with
+    | None -> assert false
+    | Some (t, es) ->
+        if (is_bf !gamma' (typerType_of_typ !gamma' t)) then
+          gamma := add_classe_env !gamma {
+            tc_name = c.c_name;
+            ttype_class_params = assert false;
+            tparams = assert false;
+            tderiv = assert false;
+            tdecls = [];
+            tc_loc = c.c_loc;
+            tc_env = assert false  
+          }
+        else
+          raise (TypeError (t.t_loc, "Ce type n'est pas bien forme"))
 
 
-
+  
