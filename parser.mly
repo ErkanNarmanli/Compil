@@ -290,6 +290,6 @@ classe_Main:
 
 fichier:
     classes = classe*; main = classe_Main; EOF
-        {{ classes = classes; main = main; f_loc = ($startpos, $endpos) }} 
+        {{ f_classes = classes; main = main }} 
 ;
 

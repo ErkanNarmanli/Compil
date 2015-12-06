@@ -1,4 +1,3 @@
-(* TODO : RELIRE TOUT LE TAST *)
 open Ast
 
 (* Arbre de syntaxe abstraite décoré de Mini-Scala*)
@@ -22,13 +21,17 @@ type typerType =
 (* Le type des contraintes >: *)
 and constr = string * typerType
 
+and context_var = 
+  | CVar of ident * typerType
+  | CVal of ident * typerType
+
 (* env (= environnement local) est un ensemble de classes,
  *  et un ensemble de de contraintes de type,    
  *  et une suite ordonée de déclarations de variables *)
 and context = {
     classes     : tclasse list;
     constrs     : constr list; 
-    vars        : tvar list;
+    vars        : context_var list;
     meths       : tmethode list
 }
 
@@ -36,8 +39,7 @@ and context = {
 and tfichier = {
     tclasses    : tclasse list ;
     tmain       : tclasse_Main ;
-    tf_loc      : loc ; 
-    tf_env      : context}
+    }
 
 and tclasse = {
     tc_name             : ident ;
@@ -117,8 +119,10 @@ and targuments_typeCont = typerType list
 
 and tclasse_Main = {
     tcM_cont    : tclasse_MainCont  ;
-    tcM_loc     : loc               ; } (* idem juste la loc du mot clef
-                                         * 'class Main', c'est mieux *)
+    tcM_loc     : loc               ;
+    tcM_env     : context
+} 
+ 
 and tclasse_MainCont = tdecl list
 
 and texpr = {
@@ -154,8 +158,8 @@ and tinstruction =
     | TIexpr    of texpr
 
 and tbinop = {
-    tb_cont             : binopCont ;
-    tb_loc              : loc }
+    tb_cont     : binopCont ;
+    tb_loc      : loc }
 
 and tacces = {
     ta_cont     : taccesCont    ;
@@ -166,14 +170,17 @@ and taccesCont =
     | TAident      of ident
     | TAexpr_ident of texpr * ident
 
+
+(* une fonction utile *)
+(* 'a list option -> 'a list *)
+let get_list = function
+  | None -> []
+  | Some l -> l
+    
 (* Des accesseurs parce que yen a marre de faire des matchs dans tous les sens *)
 let get_var_id tv = match tv.tv_cont with
     | TVal (id, _, _)   -> id
     | TVar (id, _, _)   -> id
-
-let get_meth_id m = match m.tm_cont with
-    | TMbloc tmb -> tmb.tmb_name
-    | TMexpr tme -> tme.tme_name
 
 let tacces_of_acces a = match a.a_cont with
     | Aident i ->           { ta_cont = TAident i; ta_loc = a.a_loc}
@@ -202,7 +209,7 @@ let get_meth_id m = match m.tm_cont with
   | TMexpr tme  -> tme.tme_name
 
 (* tmethode -> tparams *)
-let get_meth_params m = match m.tm_cont with 
+let get_tmeth_params m = match m.tm_cont with 
   | TMbloc tmb -> tmb.tmb_params
   | TMexpr tme -> tme.tme_params
 
@@ -264,5 +271,27 @@ let get_ptc_id ptc = match ptc.ptc_cont with
   | PTCmoins pt ->  fst pt.pt_cont
   | PTCrien  pt ->  fst pt.pt_cont
 
+(* param_type -> ident *)
+let get_pt_id pt = fst pt.pt_cont
+
+(* Rend la position d'une liste de param_typ_classe
+ * param_type_classe -> loc *)
+let make_ptcs_loc ptcs = 
+    let rec aux = function
+        | []      -> failwith "make_ptcs_loc n'est pas censé prendre une
+                     liste vide, si ?"
+        | [ptc]   -> snd ptc.ptc_loc
+        | a::q    -> aux q
+    in (fst( (List.hd ptcs).ptc_loc), aux ptcs)
+
+(* methode -> param_type list *)
+let get_meth_type_params m = match m.m_cont with
+  | Mblock mb -> get_list mb.mb_type_params
+  | Mexpr  me -> get_list me.me_type_params
+
+(* methode -> tparams *)
+let get_meth_params m = match m.m_cont with 
+  | Mblock mb -> mb.mb_params
+  | Mexpr me  -> me.me_params
 
 

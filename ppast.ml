@@ -20,7 +20,7 @@ let print_o func = function
 let print_list_o func deb sep fin = print_o (print_list func deb sep fin)
 
 let rec print_fichier fich =
-    print_list print_classe "" "\n" "" fich.classes ;
+    print_list print_classe "" "\n" "" fich.f_classes ;
     print_classe_Main fich.main
 
 and print_classe cl = 

@@ -3,9 +3,9 @@ type loc    = Lexing.position * Lexing.position (* debut * fin *)
 type ident  = string
 
 type fichier = {
-    classes     : classe list ;
+    f_classes     : classe list ;
     main        : classe_Main ; 
-    f_loc       : loc ; }
+    }
 
 and classe = {
     c_name              : ident ;
