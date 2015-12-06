@@ -9,7 +9,7 @@
 *.cmxa
 *.automaton
 *.dot
-*.swp
+*.sw[op]
 *.conflicts
 
 *.depend

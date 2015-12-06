@@ -3,7 +3,7 @@ GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=main
 
 make: $(BIN)
-	for f in tests/typing/good/*.scala; do ./$(BIN) --error-only $$f; done 
+	./test -2 ./$(BIN)
 
 $(BIN): $(CMO)
 	ocamlc -o $(BIN) $(CMO)
