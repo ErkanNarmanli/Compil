@@ -3,10 +3,11 @@
 
 open Format
 open Lexing
+open Typer
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
-let error_only = ref false
+let pprint = ref false
 
 (* Noms des fichiers source et cible *)
 let ifile = ref ""
@@ -16,10 +17,9 @@ let set_file f s = f := s
 
 (* Les options du compilateur que l'on affiche avec --help *)
 let options =
-  ["--parse-only", Arg.Set parse_only,
+  ["-parse-only", Arg.Set parse_only,
    "  Pour ne faire uniquement que la phase d'analyse syntaxique";
-   "--error-only", Arg.Set error_only, 
-   " Pour n'afficher que les erreurs"
+   "-pprint", Arg.Set pprint, " Pour n'afficher que les erreurs"
   ]
 
 let usage = "usage: mini-turtle [option] file.logo"
@@ -29,6 +29,13 @@ let localisation pos =
   let l = pos.pos_lnum in
   let c = pos.pos_cnum - pos.pos_bol + 1 in
   eprintf "File \"%s\", line %d, characters %d-%d:\n" !ifile l (c-1) c
+
+(* Idem en plus précis *)
+let localisation2 (p1, p2) =
+  let l1 = p1.pos_lnum in
+  let c1 = p1.pos_cnum - p1.pos_bol + 1 in
+  let c2 = p2.pos_cnum - p1.pos_cnum + c1 + 1 in
+  eprintf "File \"%s\", line %d, characters %d-%d:\n" !ifile l1 c1 c2 
 
 let () =
   (* Parsing de la ligne de commande *)
@@ -56,18 +63,18 @@ let () =
        n'est détectée.
        La fonction Lexer.token est utilisée par Parser.fichier pour obtenir
        le prochain token. *)
-    
+   
     let p = Parser.fichier Lexer.token buf in
+    if !pprint then
+      Ppast.print p; 
+    
     close_in f;
     
-    if not !error_only then
-        Ppast.print p;
-
-    if !error_only then
-
-
+    
     (* On s'arrête ici si on ne veut faire que le parsing *)
     if !parse_only then exit 0;
+    
+    let _ = type_fichier p in ()
 
     (*Interp.fichier p*)
   with
@@ -83,6 +90,12 @@ let () =
 	localisation (Lexing.lexeme_start_p buf);
 	eprintf "Erreur syntaxique@.";
 	exit 1
+    | Typer.TypeError (l, s) ->
+        (* Erreur de typage. On affiche la localisation de l'erreur et un
+         * message descriptif *)
+        localisation2 l;
+        eprintf "Erreur de typage: %s@." s;
+        exit 1
 (*    | Interp.Error s->
 	(* Erreur pendant l'interprétation *)
 	eprintf "Erreur : %s@." s;

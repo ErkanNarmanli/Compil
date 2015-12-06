@@ -119,11 +119,15 @@ rule token = parse
     | _                     { raise (Lexing_error "Caractère inconnu") } 
 
 and lex_chaine s = parse
+    | '\n'                  { raise (Lexing_error "La chaine de caractère
+                            contient un  retour chariot") }
     | '"'                   { STRING s }
     | '\\' 't'              { lex_chaine (s^"\t") lexbuf }   
     | '\\' 'n'              { lex_chaine (s^"\n") lexbuf }   
     | '\\' '\\'             { lex_chaine (s^"\\") lexbuf }
     | '\\' '"'              { lex_chaine (s^"\"") lexbuf }
+    | '\\' car              { raise (Lexing_error "Ce caractère n'est pas
+                            échapable") }
     | car as c              { lex_chaine (s^(String.make 1 c)) lexbuf }
     | eof                   { raise (Lexing_error "chaine de caractère non terminée") }
     | _                     { raise (Lexing_error "caractère non reconnu")}

@@ -36,7 +36,7 @@ and print_classe cl =
     end ;
     print_list print_decl "\n\t{" ", " "}" cl.decls
 
- and print_decl d = match d.decl_cont with 
+and print_decl d = match d.decl_cont with 
     | Dvar v   -> print_var v
     | Dmeth m  -> print_methode m
 

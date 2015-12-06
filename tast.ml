@@ -184,7 +184,7 @@ let get_var_id tv = match tv.tv_cont with
 
 let tacces_of_acces a = match a.a_cont with
     | Aident i ->           { ta_cont = TAident i; ta_loc = a.a_loc}
-    | Aexpr_ident (e,i) ->  assert false
+    | Aexpr_ident (e,i) ->  failwith "On arrive jamais ici"
 
 let tbinop_of_binop b =
     { tb_cont = b.b_cont ; tb_loc = b.b_loc }
@@ -193,15 +193,12 @@ let get_acces_id a = match a.a_cont with
     | Aident i ->           i
     | Aexpr_ident (e, i) -> i       
 
-let get_decl_typ = function
-    | TDvar v ->    begin match v.tv_cont with
-                        | TVal (_, t, _) ->     t
-                        | TVar (_, t, _) ->     t
-                    end
-    | TDmeth m ->   assert false  
+(* param_type_classe -> ident *)
+let get_ptc_id p = match p.ptc_cont with
+  | PTCplus  pt -> fst pt.pt_cont
+  | PTCmoins pt -> fst pt.pt_cont
+  | PTCrien  pt -> fst pt.pt_cont
 
-(* tparam_type_classe -> ident *)
-let get_ptc_id p = assert false
 
 (* tmethode -> ident *)
 let get_meth_id m = match m.tm_cont with
