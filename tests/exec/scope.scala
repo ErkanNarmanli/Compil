@@ -12,5 +12,6 @@ object Main {
     print(a.x); print("\n");
     print(a.g()); print("\n");
     print(a.f(3)); print("\n")
+
   }
 }
