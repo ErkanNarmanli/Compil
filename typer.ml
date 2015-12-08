@@ -1,5 +1,6 @@
 open Ast
 open Tast
+open Misc
 
 exception TypeError of loc * string
 
@@ -13,15 +14,6 @@ let env0 () =
     vars    = [];
     meths   = []
   }
-
-(* Fonctions utiles *)
-
-let rec iter3 f l1 l2 l3 = match (l1, l2, l3) with
-  | ([], [], []) -> ()
-  | (t1::q1, t2::q2, t3::q3) ->
-      f t1 t2 t3;
-      iter3 f q1 q2 q3
-  | _ -> raise (Invalid_argument "Tailles incompatibles dans iter3") 
 
 (* Ajoute une variable à un environnement *)
 (* env -> context_var -> env *)
@@ -70,26 +62,6 @@ let add_tmeth_env env tm =
     vars    = env.vars;
     meths   = tm::env.meths
   }
-
-(* Affichage d'un type *)
-let rec string_of_typ = function
-  | Tany ->         "Any"
-  | TanyVal ->      "AnyVal"
-  | Tboolean ->     "Boolean"
-  | Tint ->         "Int"
-  | Tunit ->        "Unit"
-  | TanyRef ->      "AnyRef"
-  | Tstring ->      "String"
-  | Tnull ->        "Null"
-  | Tnothing ->     "Nothing"
-  | Tclasse (c, targst) ->
-                    string_of_class c.tc_name targst
-
-(* Affichage d'une classe *)
-and string_of_class i targst =
-  i^"["^(
-  List.fold_left (fun s t -> s^(string_of_typ t)^", ") "" targst.tat_cont
-  )^"]"
 
 (* chercher une classe dans l'environnement env *)
 let classe_lookup env id = 

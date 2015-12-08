@@ -22,7 +22,7 @@ let options =
    "-pprint", Arg.Set pprint, " Pour n'afficher que les erreurs"
   ]
 
-let usage = "usage: mini-turtle [option] file.logo"
+let usage = "usage: main [option] file.scala"
 
 (* localise une erreur en indiquant la ligne et la colonne *)
 let localisation pos =

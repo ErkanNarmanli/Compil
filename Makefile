@@ -1,11 +1,9 @@
-CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo typer.cmo main.cmo
+CMO=ppast.cmo lexer.cmo parser.cmo misc.cmo typer.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=main
 
-make: $(BIN)
-	./test -2 ./$(BIN)
 
-$(BIN): $(CMO)
+make: $(CMO)
 	ocamlc -o $(BIN) $(CMO)
 
 .SUFFIXES: .mli .ml .cmi .cmo .mll .mly
@@ -34,5 +32,8 @@ clean:
 	ocamldep *.ml *.mli  > .depend
 
 include .depend
+
+test: make
+	./test -2 ./$(BIN)
 
 
