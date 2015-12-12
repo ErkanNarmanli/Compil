@@ -197,22 +197,19 @@ let variance_test_vars env =
 
 (* context -> unit *)
 let variance_test_meths env = 
-  List.iter (fun tm -> match tm.tm_cont with
-      | TMexpr tme -> begin match variance env tme.tres_type with
+  List.iter (fun tm -> match variance env tm.tm_res_type with
           | None -> ()
           | Some (b ,eloc) ->
               if not b then
                 raise (TypeError (eloc, "E04 : Cette variable est contravariante
-                et apparait dans une position positive"))
-          end;
+                et apparait dans une position positive"));
           List.iter (fun tp -> begin match variance env tp.tp_typ with
                 | None -> ()
                 | Some (b, eloc) ->
                     if b then
                       raise (TypeError (eloc, "E05 : Cette variable est
                       covariante et apparaît dans une position négative"))
-                end) tme.tme_params
-      | TMbloc _ -> failwith "Champ obsolète : on ne doit pas arriver ici"
+                end) tm.tm_params
     ) env.meths
 
 
@@ -221,7 +218,7 @@ let meth_lookup m_id env =
   let rec aux = function 
     | []   -> raise Not_found
     | m::q ->
-        if (get_meth_id m) = m_id then
+        if m.tm_name = m_id then
           m
         else
           aux q
@@ -716,7 +713,7 @@ let rec type_expr env tro e = match e.e_cont with
                               (* On extrait la liste des types des arguments de
                                *  la méthode *)
                                   let tau's = List.map (fun p -> p.tp_typ)
-                                  (get_tmeth_params m) in
+                                  m.tm_params in
                               (* On sépare les listes des types et des
                                * positions *)
                                   let (taus, tlocs) = List.split loctyps in  
@@ -793,7 +790,7 @@ let rec type_expr env tro e = match e.e_cont with
                                       ta_loc  = a.a_loc
                                     }, targst_of_argst env argst, es');
                                     te_typ = (subst env c targst) (
-                                      subst' (get_meth_type m)); 
+                                      subst' m.tm_res_type); 
                                     te_loc = e.e_loc
                                   }
                             end
@@ -1074,84 +1071,83 @@ let type_decl (env, l) d = match d.decl_cont with
                     tau
       end in
       (* On ajoute la méthode à gamma'' *)
-      let metexpr_temp = begin match m.m_cont with 
+      let tm = begin match m.m_cont with 
         | Mblock mb -> {
-              tme_name = mb.mb_name;
-              tme_override = mb.mb_override;
-              tme_type_params = List.map (tpt_of_pt !gamma'')
+              tm_name = mb.mb_name;
+              tm_override = mb.mb_override;
+              tm_type_params = List.map (tpt_of_pt !gamma'')
                 (get_list mb.mb_type_params);
-              tme_params = List.map (tparam_of_param !gamma'') mb.mb_params;
-              tres_type = tau;
-              tres_expr = {te_cont = TEvoid; te_typ = tau; te_loc = m.m_loc}
+              tm_params = List.map (tparam_of_param !gamma'') mb.mb_params;
+              tm_res_type = tau;
+              tm_res_expr = {te_cont = TEvoid; te_typ = tau; te_loc = m.m_loc};
+              tm_loc = m.m_loc;
+              tm_env = !gamma''
             }
         | Mexpr me  -> {
-              tme_name = me.me_name;
-              tme_override = me.me_override;
-              tme_type_params = List.map (tpt_of_pt !gamma'')
+              tm_name = me.me_name;
+              tm_override = me.me_override;
+              tm_type_params = List.map (tpt_of_pt !gamma'')
                 (get_list me.me_type_params);
-              tme_params = List.map (tparam_of_param !gamma'') me.me_params;
-              tres_type = tau;
-              tres_expr = {te_cont = TEvoid; te_typ = tau; te_loc = m.m_loc} 
+              tm_params = List.map (tparam_of_param !gamma'') me.me_params;
+              tm_res_type = tau;
+              tm_res_expr = {te_cont = TEvoid; te_typ = tau; te_loc = m.m_loc};
+              tm_loc = m.m_loc;
+              tm_env = !gamma'' 
             }
       end in
-      gamma'' := add_tmeth_env !gamma'' {
-        tm_cont = (TMexpr metexpr_temp);
-        tm_loc = m.m_loc;
-        tm_env = !gamma''
-      };
+      gamma'' := add_tmeth_env !gamma'' tm;
       (* On type l'expression qui définit la méthode *)
-      let metexpr = begin match m.m_cont with 
+      let tm' = begin match m.m_cont with 
         | Mblock mb -> 
             let te = type_expr !gamma'' (Some tau) {
               e_cont = Ebloc mb.bloc;
               e_loc = mb.bloc.bl_loc
             } in {
-              tme_name = mb.mb_name;
-              tme_override = mb.mb_override;
-              tme_type_params = List.map (tpt_of_pt !gamma'')
+              tm_name = mb.mb_name;
+              tm_override = mb.mb_override;
+              tm_type_params = List.map (tpt_of_pt !gamma'')
                 (get_list mb.mb_type_params);
-              tme_params = List.map (tparam_of_param !gamma'') mb.mb_params;
-              tres_type = tau;
-              tres_expr = te
+              tm_params = List.map (tparam_of_param !gamma'') mb.mb_params;
+              tm_res_type = tau;
+              tm_res_expr = te;
+              tm_loc = m.m_loc;
+              tm_env = !gamma''
             }
         | Mexpr me  ->
             let te = type_expr !gamma'' (Some tau ) me.res_expr in {
-              tme_name = me.me_name;
-              tme_override = me.me_override;
-              tme_type_params = List.map (tpt_of_pt !gamma'')
+              tm_name = me.me_name;
+              tm_override = me.me_override;
+              tm_type_params = List.map (tpt_of_pt !gamma'')
                 (get_list me.me_type_params);
-              tme_params = List.map (tparam_of_param !gamma'') me.me_params;
-              tres_type = tau;
-              tres_expr = te
+              tm_params = List.map (tparam_of_param !gamma'') me.me_params;
+              tm_res_type = tau;
+              tm_res_expr = te;
+              tm_loc = m.m_loc;
+              tm_env = !gamma''
             }
       end in
-      let tm = {
-        tm_cont = TMexpr metexpr;
-        tm_loc  = m.m_loc;
-        tm_env  = !gamma''
-      } in
       (* On n'effectue qu'ici les tests liée au mot clef override *)
-      if metexpr.tme_override then
+      if tm'.tm_override then
         let m' = begin try 
-          meth_lookup metexpr.tme_name env 
+          meth_lookup tm'.tm_name env 
         with
           | Not_found ->  raise (TypeError (m.m_loc, "Cette méthode n'hérite
                           d'aucune classe existante"))
         end in
-        can_override tm m'; (* Unit si pas de problème, erreur sinon 
+        can_override tm' m'; (* Unit si pas de problème, erreur sinon 
                               TODO : doit vérifier que "this" est différent dans
                               m et m' pour traiter le cas où on essaie de
                               surcharger une méthode du même bloc de decls *)
       else
         begin try
-          let _ = meth_lookup metexpr.tme_name env in
+          let _ = meth_lookup tm'.tm_name env in
           raise (TypeError (m.m_loc, "Une méthode portant le même
            nom existe déjà"))
         with
           | Not_found -> ()
         end; 
-      let new_env = add_tmeth_env env tm in
-      (update_this new_env new_env, (TDmeth tm)::l)
+      let new_env = add_tmeth_env env tm' in
+      (update_this new_env new_env, (TDmeth tm')::l)
       
 (* context -> param_type_classe -> tparam_type_heritage option -> context *)
 let ptc_add env ptc bo = match bo with

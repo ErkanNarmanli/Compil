@@ -105,35 +105,16 @@ let get_var_id tv = match tv.tv_cont with
     | TVal (id, _, _)   -> id
     | TVar (id, _, _)   -> id
 
-(* tmethode -> ident *)
-let get_meth_id m = match m.tm_cont with
-  | TMbloc tmb  -> tmb.tmb_name
-  | TMexpr tme  -> tme.tme_name
-
-(* tmethode -> tparams *)
-let get_tmeth_params m = match m.tm_cont with 
-  | TMbloc tmb -> tmb.tmb_params
-  | TMexpr tme -> tme.tme_params
-
-(* tmethode -> typerType *)
-let get_meth_type m = match m.tm_cont with
-  | TMbloc _   -> Tunit
-  | TMexpr tme -> tme.tres_type
-
 (* tmethode -> ident list *)
-let get_meth_type_params_id_list m = match m.tm_cont with
-  | TMbloc tmb -> List.map (fun tpt -> fst tpt.tpt_cont) tmb.tmb_type_params
-  | TMexpr tme -> List.map (fun tpt -> fst tpt.tpt_cont) tme.tme_type_params
+let get_meth_type_params_id_list m =
+  List.map (fun tpt -> fst tpt.tpt_cont) m.tm_type_params
 
 (* tmethode -> tparam_type_heritage option list *)
 let get_bornes_list_m m =
   let rec aux = function
       | []     -> []
       | tpt::q -> (snd tpt.tpt_cont, tpt.tpt_loc) :: (aux q)
-  in aux (match m.tm_cont with
-    | TMbloc tmb -> tmb.tmb_type_params
-    | TMexpr tme -> tme.tme_type_params
-  ) 
+  in aux m.tm_type_params
 
 (* tparam_type_classe -> ident *)
 let get_tptc_id tptc = match tptc.tptc_cont with

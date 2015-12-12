@@ -64,29 +64,14 @@ and tvarCont =
     | TVar  of ident * typerType * texpr
 
 and tmethode = {
-    tm_cont     : tmethodeCont  ;
-    tm_loc      : loc           ; (* Plutôt juste la localisation du
-                                   * nom de la methode, idéalement *)
-    tm_env      : context        ; }
-
-and tmethodeCont = 
-    | TMbloc    of tmeth_bloc
-    | TMexpr    of tmeth_expr
-
-and tmeth_bloc = {
-    tmb_name            : ident ;
-    tmb_override        : bool  ;
-    tmb_type_params     : tparam_type list ;
-    tmb_params          : tparametre list ;
-    tbloc               : tbloc ; }
-
-and tmeth_expr = {
-    tme_name            : ident ;
-    tme_override        : bool ;
-    tme_type_params     : tparam_type list ;
-    tme_params          : tparametre list ;
-    tres_type           : typerType ;
-    tres_expr           : texpr ; }
+    tm_name             : ident ;
+    tm_override         : bool ;
+    tm_type_params      : tparam_type list ;
+    tm_params           : tparametre list ;
+    tm_res_type         : typerType ;
+    tm_res_expr         : texpr ;
+    tm_loc              : loc ;
+    tm_env              : context }
 
 and tparametre = {
     tp_name             : ident ; 
