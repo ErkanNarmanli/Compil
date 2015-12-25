@@ -15,6 +15,16 @@ let rec iter3 f l1 l2 l3 = match (l1, l2, l3) with
       iter3 f q1 q2 q3
   | _ -> raise (Invalid_argument "Tailles incompatibles dans iter3") 
 
+(* Même résultat qu'un List.filter puis List.map en un seul parcours de la liste
+ * ('a -> 'b option) -> 'a list -> 'b list *)
+let rec filter_map f = function
+  | [] -> []
+  | t::q ->
+      begin match f t with
+        | None    -> filter_map f q
+        | Some x  -> x::(filter_map f q)
+      end
+
 (* Indique si les éléments de la liste après passage par la fonction de
  * transport sont distincts deux à deux.
  * ('a -> string) -> 'a list -> bool *)
@@ -95,6 +105,16 @@ let get_meth_type_params m = match m.m_cont with
   | Mblock mb -> get_list mb.mb_type_params
   | Mexpr  me -> get_list me.me_type_params
 
+(* methode -> ident *)
+let get_meth_id m = match m.m_cont with
+  | Mblock mb ->  mb.mb_name
+  | Mexpr me  ->  me.me_name 
+
+(* var -> ident *)
+let get_var_id v = match v.v_cont with
+  | Var(i, _, _) -> i
+  | Val(i, _, _) -> i
+
 
 (******************************
  * Accesseurs pour l'AST typé *
@@ -106,7 +126,7 @@ let get_cv_id = function
   | CVal (i, _) -> i
 
 (* tvar -> ident *)
-let get_var_id tv = match tv.tv_cont with
+let get_tvar_id tv = match tv.tv_cont with
     | TVal (id, _, _)   -> id
     | TVar (id, _, _)   -> id
 

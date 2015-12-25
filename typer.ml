@@ -469,7 +469,7 @@ let rec is_bf env loc0 = function
   | _ -> None
 
 
-(* Typage à proprement parler *)
+(* TYPAGE À PROPREMENT PARLER *)
 
 (* Typage des expressions *)
 let rec type_expr env tro e = match e.e_cont with
@@ -926,54 +926,64 @@ let rec type_expr env tro e = match e.e_cont with
                              raise (TypeError (e.e_loc, "Le type de la valeur
                              renvoyée n'est pas compatible avec le type de
                              retour de la méthode "))
-  | Ebloc b ->  match b.bl_cont with
-                | []    -> {
-                             te_cont = TEbloc [];
-                             te_typ = Tunit;
-                             te_loc = e.e_loc
-                           }
-                | [Iexpr e']  -> let e'' = type_expr env tro e' in
-                           {
-                             te_cont = TEbloc [ TIexpr e'' ];
-                             te_typ  = e''.te_typ;
-                             te_loc = e.e_loc
-                           }
-                | ins::q -> 
-                            let q' =  { e_cont = Ebloc { 
-                                        bl_cont  = q ;
-                                        bl_loc = b.bl_loc
-                                        };
-                                        e_loc = e.e_loc
-                                    } in
-                            begin match ins with
-                              | Ivar v      -> 
-                                  let (env', tv) = type_var tro env v in
-                                  let eb = type_expr env' tro q' in
-                                  let b' = begin match eb.te_cont with
-                                    | TEbloc bl -> bl 
-                                    | _         -> failwith "cette variable ne pas
-                                                  être autre chose qu'un
-                                                  bloc."
-                                  end in 
-                                  {
-                                    te_cont = TEbloc ( (TIvar tv) :: b');
-                                    te_typ = eb.te_typ;
-                                    te_loc = e.e_loc 
-                                  }
-                              | Iexpr  e'    -> 
-                                  let eb = type_expr env tro q' in
-                                  let b' = begin match eb.te_cont with
-                                  | TEbloc bl -> bl 
-                                  | _         -> failwith "cette variable ne pas
-                                                  être autre chose qu'un bloc"
-                                  end in      
-                                  let e'' = type_expr env tro e' in
-                                      {
-                                          te_cont = (TEbloc ((TIexpr e'') :: b'));
-                                          te_typ  = eb.te_typ ;
-                                          te_loc  = e.e_loc
-                                      }
-                            end
+  | Ebloc b -> type_bloc env tro b
+
+and type_bloc env tro b = 
+  (* Test d'unicité des variables LOCALES *)
+  let var_id_list =
+    filter_map
+      (function
+        | Ivar v -> Some (get_var_id v)
+        | Iexpr _ -> None)
+      b.bl_cont in
+  if not (list_uniq (fun x -> x) var_id_list) then
+    raise (TypeError (b.bl_loc, "Ce bloc contient plusieurs variables avec le
+    même nom."));
+  (* typage du bloc : *)
+  let rec type_bloc_aux env = function
+    | []    -> {
+          te_cont = TEbloc [];
+          te_typ = Tunit;
+          te_loc = b.bl_loc
+        }
+    | [Iexpr e']  -> 
+        let e'' = type_expr env tro e' in {
+          te_cont = TEbloc [ TIexpr e'' ];
+          te_typ  = e''.te_typ;
+          te_loc = b.bl_loc
+        }
+    | ins::q -> 
+        begin match ins with
+          | Ivar v -> 
+              let (env', tv) = type_var tro env v in
+              let eb = type_bloc_aux env' q in
+              let b' = begin match eb.te_cont with
+                | TEbloc bl -> bl 
+                | _         -> failwith "cette variable ne pas
+                              être autre chose qu'un
+                              bloc."
+              end in 
+              {
+                te_cont = TEbloc ( (TIvar tv) :: b');
+                te_typ = eb.te_typ;
+                te_loc = b.bl_loc 
+              }
+          | Iexpr e' -> 
+              let eb = type_bloc_aux env q in
+              let b' = begin match eb.te_cont with
+              | TEbloc bl -> bl 
+              | _         -> failwith "cette variable ne pas
+                              être autre chose qu'un bloc"
+              end in      
+              let e'' = type_expr env tro e' in
+                  {
+                      te_cont = (TEbloc ((TIexpr e'') :: b'));
+                      te_typ  = eb.te_typ ;
+                      te_loc  = b.bl_loc
+                  }
+        end in
+  type_bloc_aux env b.bl_cont
+
 
 (* typerType option -> env -> var -> (env * tvar) *
  * Type la variable en faisant tous les tests de sous typage et de bien
@@ -1088,7 +1098,6 @@ let tparam_of_param env p =
 
 (* Vérifie l'alpha équivalence des types des paramètres de deux méthodes.
  * tmethode -> tmethode -> Cset.t *) 
-(* FIXME : incomplet *)
 let alpha_eq m1 m2 = 
   let rec f cset ts1 ts2 = match (ts1, ts2) with
     | ([], [])          -> cset
@@ -1245,7 +1254,7 @@ let type_decl (env, tdl) d = match d.decl_cont with
           List.exists (fun tm -> tm.tm_name = v_id) env.meths then
         raise (TypeError (v.v_loc, "Le nom de variable "^v_id^" est déjà
         pris."));
-      (* Pas de problème alor on type la méthode et on l'ajoute à
+      (* Pas de problème alors on type la méthode et on l'ajoute à
        * l'environnement. *)
       let env', tv = (type_var None env v) in
       (env', (TDvar tv)::tdl) 
@@ -1260,6 +1269,13 @@ let type_decl (env, tdl) d = match d.decl_cont with
       if not (list_uniq (fun p -> p.p_name) (get_meth_params m)) then
         raise (TypeError (m.m_loc, "Les paramètres de cette méthode
         ne sont pas distincts deux à deux."));
+      (* Unicité : On vérifie que le nom de la méthode qu'on veut ajouter n'est
+       * pas déjà pris par une variable, on s'occupe de la surcharge de méthodes
+       * plus loin. *)
+      let m_id = get_meth_id m in
+      if  List.exists (fun cv -> get_cv_id cv = m_id) env.vars then
+        raise (TypeError (m.m_loc, "Le nom de méthode "^m_id^" est déjà
+        pris."));
       let gamma'' = ref env in
       (* On ajoute les paramètres de type comme des classes. *)
       gamma'' :=  List.fold_left pt_add !gamma'' (get_meth_type_params m);
