@@ -1,6 +1,7 @@
 open Tast
 open Ast
 
+module Sset = Set.Make(String)
 
 (**************************
  * MISCELLANEOUS FUNCTIONS *
@@ -13,6 +14,20 @@ let rec iter3 f l1 l2 l3 = match (l1, l2, l3) with
       f t1 t2 t3;
       iter3 f q1 q2 q3
   | _ -> raise (Invalid_argument "Tailles incompatibles dans iter3") 
+
+(* Indique si les éléments de la liste après passage par la fonction de
+ * transport sont distincts deux à deux.
+ * ('a -> string) -> 'a list -> bool *)
+let list_uniq f l = 
+  let rec aux sset = function
+    | [] -> true
+    | t::q ->
+        let s = f t in
+        if Sset.mem s sset then
+          false
+        else
+          aux (Sset.add s sset) q in
+  aux Sset.empty l
 
 (* 'a list option -> 'a list *)
 let get_list = function
@@ -29,25 +44,10 @@ let make_ptcs_loc ptcs =
         | a::q    -> aux q
     in (fst( (List.hd ptcs).ptc_loc), aux ptcs)
 
-(* Affichage d'un type *)
-let rec string_of_typ = function
-  | Tany ->         "Any"
-  | TanyVal ->      "AnyVal"
-  | Tboolean ->     "Boolean"
-  | Tint ->         "Int"
-  | Tunit ->        "Unit"
-  | TanyRef ->      "AnyRef"
-  | Tstring ->      "String"
-  | Tnull ->        "Null"
-  | Tnothing ->     "Nothing"
-  | Tclasse (c, targst) ->
-                    string_of_class c.tc_name targst
-
-(* Affichage d'une classe *)
-and string_of_class i targst =
-  i^"["^(
-  List.fold_left (fun s t -> s^(string_of_typ t)^", ") "" targst.tat_cont
-  )^"]"
+(* Remplace le premier élément de la liste vérifiant le prédicat p par x. *)
+let rec replace_in_list p x = function
+  | []    ->  []
+  | t::q  ->  if p t then x::q else t::(replace_in_list p x q)
 
 
 (*************************
@@ -100,6 +100,11 @@ let get_meth_type_params m = match m.m_cont with
  * Accesseurs pour l'AST typé *
  ******************************)
 
+(* context_var -> ident *)
+let get_cv_id = function
+  | CVar (i, _) -> i
+  | CVal (i, _) -> i
+
 (* tvar -> ident *)
 let get_var_id tv = match tv.tv_cont with
     | TVal (id, _, _)   -> id
@@ -115,6 +120,9 @@ let get_bornes_list_m m =
       | []     -> []
       | tpt::q -> (snd tpt.tpt_cont, tpt.tpt_loc) :: (aux q)
   in aux m.tm_type_params
+
+(* tparam_type -> ident *)
+let get_tpt_id tpt = fst tpt.tpt_cont
 
 (* tparam_type_classe -> ident *)
 let get_tptc_id tptc = match tptc.tptc_cont with
@@ -148,4 +156,20 @@ let tacces_of_acces a = match a.a_cont with
 (* binop -> tbinop *)
 let tbinop_of_binop b =
     { tb_cont = b.b_cont ; tb_loc = b.b_loc }
+
+(* tparam_type_classe -> tparam_type *)
+let tpt_of_tptc tptc = match tptc.tptc_cont with
+  | TPTCplus tpt  -> tpt
+  | TPTCmoins tpt -> tpt
+  | TPTCrien tpt  -> tpt
+
+(* tclasse -> context_classe *)
+let context_classe_of_tclasse tc = {
+  cc_name   = tc.tc_name;
+  cc_tptcs  = tc.ttype_class_params;
+  cc_params = tc.tparams;
+  cc_deriv  = tc.tderiv;
+  cc_env    = tc.tc_env
+}
+
 

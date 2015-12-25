@@ -5,6 +5,7 @@ open Ast
 (*ON DÉFINIT DES OBJETS QUI SERONT UTILES PLUS TARD*)
 type loc    = Lexing.position * Lexing.position (* début, fin *)
 type ident  = string
+module Smap = Map.Make(String)
 
 type typerType =
     | Tany
@@ -16,20 +17,31 @@ type typerType =
     | Tstring
     | Tnull
     | Tnothing
-    | Tclasse of tclasse * targuments_type
+    | Tclasse of ident * substitution
 
 (* Le type des contraintes >: *)
 and constr = string * typerType
 
+(* Le minimum d'information dont on a besion sur les variables dans
+ * l'environnement *)
 and context_var = 
   | CVar of ident * typerType
   | CVal of ident * typerType
+
+(* Idem pour les classes *)
+and context_classe = {
+  cc_name       : ident;
+  cc_tptcs      : tparam_type_classe list;
+  cc_params     : tparametre list;
+  cc_deriv      : (typerType * texpr list) option;
+  cc_env        : context;
+}
 
 (* env (= environnement local) est un ensemble de classes,
  *  et un ensemble de de contraintes de type,    
  *  et une suite ordonée de déclarations de variables *)
 and context = {
-    classes     : tclasse list;
+    classes     : context_classe list;
     constrs     : constr list; 
     vars        : context_var list;
     meths       : tmethode list
@@ -155,5 +167,7 @@ and taccesCont =
     | TAident      of ident
     | TAexpr_ident of texpr * ident
 
-
+(* Un type pour les substitutions
+ * On chosit de représenter les substitutions par des Maps *)
+and substitution = typerType Smap.t
 
