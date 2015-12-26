@@ -157,7 +157,7 @@ let rec subst env s = function
 let subst_id env s id = subst env s (Tclasse (id, subst0 ()))
 
 (************************
- * 2 PRINTING FUNCTIONS *
+ * PRINTING FUNCTIONS   *
  ************************)
 
 (* Affichage d'un type *)
@@ -181,6 +181,14 @@ and string_of_class env i sub =
     (List.map (subst_id env sub) (get_tptc_id_list (try classe_lookup env i with
     | Not_found -> failwith ("c'est qui "^i^" ?")).cc_tptcs))
   )^"]"
+
+(* context -> substitution -> unit *) 
+let print_subst env s = 
+  print_string "{";
+  let print_cor id t =
+    Printf.printf "%s -> %s; " id (string_of_typ env t)
+  in Smap.iter print_cor s;
+  print_endline "}"
 
 (* context -> typ -> typerType *)
 let rec typerType_of_typ env t = match t.t_name with
@@ -214,18 +222,19 @@ let targst_of_argst env a =
     | Some l' -> List.map (typerType_of_typ env) l'
   in { tat_cont = l; tat_loc = a.at_loc }
 
-(* Recherche de la déclaration d'une variable dans une var list *)
-(* ident -> tvar list -> typerType *)
+(* Recherche de la déclaration d'une variable dans une var list et renvoie son
+ * type ainsi qu'on booléen indiquant si la variable est mutable. *)
+(* ident -> tvar list -> (typerType * bool) *)
 let var_lookup id env = 
   let rec aux = function
     | []    ->  raise Not_found 
     | cv::q ->  begin match cv with
                   | CVar (i, t) ->  if i = id then
-                                      t
+                                      (t, true)
                                     else
                                       aux q
                   | CVal (i, t) ->  if i = id then
-                                      t
+                                      (t, false)
                                     else
                                       aux q
     end in aux env.vars
@@ -238,7 +247,7 @@ let var_lookup id env =
 let variance env = function
   | Tclasse(i, _) -> 
       (* Realy need explanations here *)
-      let tptc_list = try begin match var_lookup "this" env with
+      let tptc_list = try begin match fst (var_lookup "this" env) with
           | Tclasse(i', _) ->
               let c = begin try
                 classe_lookup env i'
@@ -346,12 +355,15 @@ let rec is_sstype env loc0 t1 t2 = match (t1, t2) with
   | Tnothing, _             -> true
   | Tnull,  Tclasse (_, _)  -> true
   | Tnull, Tstring          -> true 
-  | _, TanyVal              -> t1 = Tint || t1 = Tunit || t1 = Tboolean 
+  | _, TanyVal              ->
+      t1 = Tint || t1 = Tunit || t1 = Tboolean || t1 = TanyVal 
   | _, Tany                 -> true
   | _, TanyRef              -> begin match t1 with
-                                 | Tclasse (_, _)   -> true
-                                 | Tstring | Tnull  -> true
-                                 | _                -> false
+                                 | Tclasse (_, _) -> true
+                                 | Tstring        -> true
+                                 | Tnull          -> true
+                                 | TanyRef        -> true
+                                 | _              -> false
                                end
   | Tclasse (cid1, s1), Tclasse (cid2, s2) ->
       (* Cas où cid1 = cid2, on doit vérifier les contraintes sur les paramètres de
@@ -401,6 +413,25 @@ let rec is_sstype env loc0 t1 t2 = match (t1, t2) with
           with 
             | Not_found -> false
         end
+      end
+  | _, Tclasse (cid, _) ->
+      let cs = List.filter (fun (id, t) -> id = cid) env.constrs in
+      begin match cs with
+        | []  -> false
+        | l   -> 
+            let borne = snd (List.hd l) in
+            is_sstype env loc0 t1 borne
+      end
+  | Tclasse (cid, s), _ ->
+      let c = begin try
+        classe_lookup env cid
+      with
+        | Not_found ->
+            failwith "Dans is_sstype : classe_lookup ne devrait pas échouer."
+      end in begin match c.cc_deriv with
+        | None -> false
+        | Some (t, _) ->
+            is_sstype env loc0 t t2
       end
   | t1, t2 -> t1 = t2
 
@@ -491,7 +522,7 @@ let rec type_expr env tro e = match e.e_cont with
   | Ethis         ->  begin try {
                         te_cont = TEthis;
                         te_loc = e.e_loc;
-                        te_typ = var_lookup "this" env }
+                        te_typ = fst (var_lookup "this" env) }
                       with
                         | Not_found ->  raise (TypeError (e.e_loc, "impossible
                           de déterminer à quoi \"this\" fait référence"))
@@ -501,7 +532,7 @@ let rec type_expr env tro e = match e.e_cont with
                          begin try {
                            te_cont = TEacc (tacces_of_acces a);
                            te_loc = e.e_loc;
-                           te_typ = var_lookup id env }
+                           te_typ = fst (var_lookup id env) }
                          with
                            | Not_found ->
                                    type_expr env tro {
@@ -530,7 +561,7 @@ let rec type_expr env tro e = match e.e_cont with
                                 * existante, var_lookup soulève une
                                 * erreur sinon *)
                                let t = begin try 
-                                 var_lookup x c.cc_env
+                                 fst (var_lookup x c.cc_env)
                                with
                                  | Not_found ->  raise (TypeError
                                      (e'.e_loc, "La classe de cette expression
@@ -553,9 +584,12 @@ let rec type_expr env tro e = match e.e_cont with
                          | Aident i -> (* cas où a est juste un nom de
                                         * variable *)
                              begin try
-                               let t1 = var_lookup i env in
+                               let (t1, mut1) = var_lookup i env in
                                (* on a bien trouvé la variable identifiée
-                                * par i *)
+                                * par i. On vérifie qu'elle est bien mutable. *)
+                               if not mut1 then
+                                 raise (TypeError (a.a_loc, "La variable "^i^"
+                                 n'est pas mutable."));
                                let e'' = type_expr env tro e' in
                                if is_sstype env e'.e_loc e''.te_typ t1 then
                                  (* t1 est bien un sous type de t2 *)
@@ -711,11 +745,12 @@ let rec type_expr env tro e = match e.e_cont with
                 if (eb'.te_typ = Tboolean) &&
                    ((is_sstype env e.e_loc e1'.te_typ e2'.te_typ) ||
                    (is_sstype env e.e_loc e2'.te_typ e1'.te_typ))
-                then {
-                      te_cont = TEifelse (eb', e1', e2');
-                      te_typ = max_type env e1'.te_typ e2'.te_typ e.e_loc;
-                      te_loc = e.e_loc
-                    }
+                then
+                  {
+                    te_cont = TEifelse (eb', e1', e2');
+                    te_typ = max_type env e1'.te_typ e2'.te_typ e.e_loc;
+                    te_loc = e.e_loc
+                  }
                 else raise (TypeError (e.e_loc, "Le type de retour est mal 
                      défini : les cas if et else ont des types
                      incompatibles"))
@@ -842,7 +877,7 @@ let rec type_expr env tro e = match e.e_cont with
                        * formés *)
                       begin match (List.fold_left (fun errloc_o (t, tloc) ->
                                     begin match errloc_o with
-                                      | None -> is_bf env argst.at_loc t
+                                      | None -> is_bf m.tm_env argst.at_loc t
                                       | Some errloc as o -> o
                                     end ) None loctyps) with 
                         | Some errloc -> raise (TypeError (errloc, "Ce
@@ -868,25 +903,21 @@ let rec type_expr env tro e = match e.e_cont with
                       (* On extrait la liste des types des arguments de la
                        * méthode dans sa définition. *)
                       let tau's = List.map (fun p -> p.tp_typ) m.tm_params in
-                      (* On vérifie que les types calculés sont bien supérieurs
+                      (* On vérifie que les types calculés sont bien inférieurs
                        * aux types annoncés par le programme *)
                       begin try 
                         iter3 (fun t1 t2 eloc ->
-                            if is_sstype env e.e_loc t1 t2 then
-                                ()
-                            else 
-                                raise (TypeError (eloc, "Les types sont
-                                incompatibles")))
-                            (List.map (fun exp -> exp.te_typ) es')
-                            (List.map (subst env ss') tau's) 
-                            (List.map (fun exp -> exp.te_loc) es')
+                          if not (is_sstype env e.e_loc t1 t2) then
+                            raise (TypeError (eloc, "Ces types sont
+                            incompatibles")))
+                          (List.map (fun exp -> exp.te_typ) es')
+                          (List.map (subst env ss') tau's) 
+                          (List.map (fun exp -> exp.te_loc) es')
                       with
                         | Invalid_argument _ -> raise (TypeError
                         (e.e_loc, "Cette méthode n'a pas reçu le bon
                         nombre d'arguments."))
                       end;
-
-
                       (* On type enfin l'application de la méthode. *)
                       {
                         te_cont = TEacc_typ_exp ({
@@ -899,33 +930,40 @@ let rec type_expr env tro e = match e.e_cont with
                 end
 
                       
-  | Ereturn None -> if is_sstype env e.e_loc Tunit (match tro with
-                              | None -> failwith "On a oublié de mettre le type
-                                  de retour de la méthode qu'on type dans tro"
-                              | Some tr -> tr) then
-                      {
-                        te_cont = TEreturn None;
-                        te_typ = Tnothing;
-                        te_loc = e.e_loc
-                      }
-                    else
-                      raise (TypeError (e.e_loc, "Soit il manque un argument à
-                      return soit le type de retour de cette méthode est mal
-                      spécifié"))
-  | Ereturn (Some e') -> let tr = begin match tro with | None -> failwith "On a
-                         oublié de préciser le type de retour de la méthode
-                         qu'on type" | Some tr -> tr end in
-                         let e'' = type_expr env tro e' in
-                         if is_sstype env e''.te_loc e''.te_typ tr then
-                           {
-                             te_cont = TEreturn (Some e'');
-                             te_typ = Tnothing;
-                             te_loc = e.e_loc
-                           }
-                         else
-                             raise (TypeError (e.e_loc, "Le type de la valeur
-                             renvoyée n'est pas compatible avec le type de
-                             retour de la méthode "))
+  | Ereturn None ->
+      let tr = begin match tro with
+        | Some tr -> tr
+        | None -> 
+            raise (TypeError (e.e_loc, "On ne peut pas faire d'appel à return
+            hors d'une méthode.")) 
+      end in
+      if is_sstype env e.e_loc Tunit tr then
+        {
+          te_cont = TEreturn None;
+          te_typ = Tnothing;
+          te_loc = e.e_loc
+        }
+      else
+        raise (TypeError (e.e_loc, "Soit il manque un argument à
+        return soit le type de retour de cette méthode est mal
+        spécifié"))
+  | Ereturn (Some e') ->
+      let tr = begin match tro with
+        | None ->
+            raise (TypeError (e.e_loc, "On ne peut pas faire d'appel à return
+            hors d'une méthode."))
+        | Some tr -> tr end in
+            let e'' = type_expr env tro e' in
+            if is_sstype env e''.te_loc e''.te_typ tr then
+              {
+                te_cont = TEreturn (Some e'');
+                te_typ = Tnothing;
+                te_loc = e.e_loc
+              }
+            else
+                raise (TypeError (e.e_loc, "Le type de la valeur
+                renvoyée n'est pas compatible avec le type de
+                retour de la méthode "))
   | Ebloc b -> type_bloc env tro b
 
 and type_bloc env tro b = 
@@ -1211,7 +1249,7 @@ let can_override env m1 m2 =
   (* D'abord, on vérifie qu'on n'est pas en train d'essayer de surcharger une
    * méthode définie dans le même bloc et non une méthode héritée. *)
   let (t1, t2) = try
-    (var_lookup "this" m1.tm_env, var_lookup "this" m2.tm_env) 
+    (fst (var_lookup "this" m1.tm_env), fst (var_lookup "this" m2.tm_env)) 
   with
     | Not_found -> failwith "This doit figurer dans l'environnement des méthodes
                    à ce moment"
@@ -1228,8 +1266,6 @@ let can_override env m1 m2 =
            * sous-typage. *)
           let tr1 = m1.tm_res_type in
           let tr2 = alpha_subst cset m2.tm_res_type in
-          print_endline (string_of_typ env tr1);
-          print_endline (string_of_typ env tr2);
           if (is_sstype env m1.tm_loc tr1 tr2) then
             ()
           else
@@ -1276,6 +1312,8 @@ let type_decl (env, tdl) d = match d.decl_cont with
       if  List.exists (fun cv -> get_cv_id cv = m_id) env.vars then
         raise (TypeError (m.m_loc, "Le nom de méthode "^m_id^" est déjà
         pris."));
+      (* On définit enfin un nouvel environnement pour la méthode qu'on va
+       * remplir au fur et à mesure. *)
       let gamma'' = ref env in
       (* On ajoute les paramètres de type comme des classes. *)
       gamma'' :=  List.fold_left pt_add !gamma'' (get_meth_type_params m);
@@ -1328,7 +1366,11 @@ let type_decl (env, tdl) d = match d.decl_cont with
             let te = type_expr !gamma'' (Some tau) {
               e_cont = Ebloc mb.bloc;
               e_loc = mb.bloc.bl_loc
-            } in {
+            } in
+            if not (is_sstype !gamma'' te.te_loc te.te_typ tau) then
+              raise (TypeError (te.te_loc, "Le type de cette expression n'est
+              pas compatible avec le type de retour indiqué pour la méthode."));
+            {
               tm_name = mb.mb_name;
               tm_override = mb.mb_override;
               tm_type_params = List.map (tpt_of_pt !gamma'')
@@ -1340,7 +1382,12 @@ let type_decl (env, tdl) d = match d.decl_cont with
               tm_env = !gamma''
             }
         | Mexpr me  ->
-            let te = type_expr !gamma'' (Some tau) me.res_expr in {
+            let te = type_expr !gamma'' (Some tau) me.res_expr in
+            if not (is_sstype !gamma'' te.te_loc te.te_typ tau) then
+              raise (TypeError (te.te_loc, "Le type de cette expression
+              ("^(string_of_typ !gamma'' te.te_typ)^") n'est pas compatible
+              avec le type de retour "^(string_of_typ !gamma'' tau)^"."));
+            {
               tm_name = me.me_name;
               tm_override = me.me_override;
               tm_type_params = List.map (tpt_of_pt !gamma'')
@@ -1360,11 +1407,7 @@ let type_decl (env, tdl) d = match d.decl_cont with
           | Not_found ->  raise (TypeError (m.m_loc, "Cette méthode n'hérite
                           d'aucune classe existante"))
         end in
-        can_override !gamma'' tm' m'; (* Unit si pas de problème, erreur sinon 
-                              TODO : doit vérifier que "this" est différent dans
-                              m et m' pour traiter le cas où on essaie de
-                              surcharger une méthode du même bloc de
-                              declaration. *)
+        can_override !gamma'' tm' m'; 
       else
         if List.exists (fun cm -> cm.tm_name = tm'.tm_name) env.meths then
           raise (TypeError (m.m_loc, "Une méthode portant le même
@@ -1389,8 +1432,9 @@ let ptc_add env ptc = match get_ptc_borne ptc with
                   cc_name   = get_ptc_id ptc;
                   cc_tptcs  = [];
                   cc_params = [];
-                  cc_deriv  = Some (tau', []); (* en est-on bien sûr ... *)
-                  cc_env    = env (* On ne s'en sert jamais. *)
+                  cc_deriv  = Some (tau', []);
+                  cc_env    = env (* FIXME : ajouter les méthodes dont on
+                  hérite...*)
             }
         | Some eloc -> raise (TypeError (eloc, "Le type de la borne est mal
             formé à l'endroit indiqué"))
@@ -1455,6 +1499,7 @@ let tparam_of_param env p =
     tp_typ  = typerType_of_typ env p.p_typ;
     tp_loc = p.p_loc
   }  
+  
 
 (* typage des classes
  * context -> classe -> (context * tclasse) *) 
@@ -1495,7 +1540,7 @@ let type_classe env c =
         begin match is_bf !gamma' t.t_loc tau with
           | None ->
               begin match tau with
-                | Tclasse (cid, _) ->
+                | Tclasse (cid, s) ->
                     (* On va chercher dans l'environnement la classe dont on
                      * hérite. *)
                     let c' = begin try
@@ -1504,12 +1549,14 @@ let type_classe env c =
                       | Not_found -> raise (TypeError (t.t_loc, "La classe
                       \""^cid^"\" n'existe pas."))
                     end in
-                    (* On ajoute les méthodes et variables héritées à gamma' *)
+                    (* On ajoute les méthodes et variables héritées à gamma'.
+                     * Attention, l'ajout des méthodes est délicat. *)
+                    let add_meths = c'.cc_env.meths in
                     gamma' := {
                       classes = !gamma'.classes;
                       constrs = !gamma'.constrs;
                       vars    = c'.cc_env.vars @ (!gamma'.vars);
-                      meths   = c'.cc_env.meths @ (!gamma'.meths);
+                      meths   = add_meths @ (!gamma'.meths);
                       }
                 (* Si on essaie d'hériter d'autre chose que d'une classe, on
                  * râle. *)

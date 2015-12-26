@@ -20,7 +20,7 @@ type typerType =
     | Tclasse of ident * substitution
 
 (* Le type des contraintes >: *)
-and constr = string * typerType
+and constr = ident * typerType
 
 (* Le minimum d'information dont on a besion sur les variables dans
  * l'environnement *)
