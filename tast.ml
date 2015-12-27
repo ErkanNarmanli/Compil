@@ -19,6 +19,10 @@ type typerType =
     | Tnothing
     | Tclasse of ident * substitution
 
+(* Un type pour les substitutions
+ * On chosit de représenter les substitutions par des Maps *)
+and substitution = typerType Smap.t
+
 (* Le type des contraintes >: *)
 and constr = ident * typerType
 
@@ -166,8 +170,4 @@ and tacces = {
 and taccesCont = 
     | TAident      of ident
     | TAexpr_ident of texpr * ident
-
-(* Un type pour les substitutions
- * On chosit de représenter les substitutions par des Maps *)
-and substitution = typerType Smap.t
 

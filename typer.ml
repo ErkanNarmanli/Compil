@@ -11,6 +11,12 @@ end
 
 module Cset = Set.Make(Couple)
 
+type postion = Pos | Neg | Neutre
+let anti = function
+  | Pos -> Neg
+  | Neg -> Pos
+  | Neutre -> Neutre
+
 (* L'environnement vide *)
 let env0 () = 
   {
@@ -239,14 +245,18 @@ let var_lookup id env =
                                       aux q
     end in aux env.vars
 
-(* context -> loc -> typerType -> (bool, loc) option
-  * covariant (+)     = Some (true, pos)
-  * contravariant (-) = Some (false, pos)
-  * sans variance     = None
-  *)
-let variance env = function
+(* Indique si un type est issu d'un paramètre de type
+ * covariant/contravariant/sans variance.
+ * context -> loc -> typerType -> (bool, loc) option
+ * covariant (+)     = Some (true, pos)
+ * contravariant (-) = Some (false, pos)
+ * sans variance     = None *)
+let get_variance env = function
   | Tclasse(i, _) -> 
-      (* Realy need explanations here *)
+      (* Seules les classes nous intéressent, lorsqu'on fait les vérifications,
+       * les classes ne sont pas encore instanciées. *)
+      (* On commence par aller chercher les paramètres de type de la classe dans
+       * laquelle on travaille. *)
       let tptc_list = try begin match fst (var_lookup "this" env) with
           | Tclasse(i', _) ->
               let c = begin try
@@ -259,6 +269,7 @@ let variance env = function
           | _ -> []
         end with
           | Not_found -> []
+      (* Puis on va voir si "i" correspond à un de ces paramètres de type. *)
       in let rec aux = function
         | [] -> None
         | tptc::q -> begin match tptc.tptc_cont with
@@ -271,37 +282,85 @@ let variance env = function
         end in aux tptc_list
   | _ -> None
 
-(* variance_test_vars : context -> unit *)
-let variance_test_vars env =
-  List.iter (fun cv -> match cv with
-      | CVar (_, t) -> begin match variance env t with
-            | None -> ()
-            | Some (b, eloc) ->
-                if b then
-                  raise (TypeError(eloc, "E01 : Cette variable de type est
-                  covariante et apparaît dans un position neutre"))
-                else
-                  raise (TypeError(eloc, "E02 : Cette variable de type est
-                  contravariante et apparaît dans un position neutre"))
+(* Soulève une erreur si la variance et la position ne respectent pas les
+ * règles.
+ * (var, eloc) est le résulat de get_variance lorsque ce n'est pas None,
+ * ident -> bool -> loc -> position -> unit *)
+let variance_tptc var eloc = function
+  | Pos ->
+      if not var then
+        raise (TypeError (eloc, "Ce type est contravariant et apparaît dans
+        une position positive."))
+  | Neg ->
+      if var then
+        raise (TypeError (eloc, "Ce type est covariant et apparaît dans un
+        position négative."))
+  | Neutre ->
+      if var then
+        raise (TypeError(eloc, "Cette variable de type est
+        covariante et apparaît dans un position neutre."))
+      else
+        raise (TypeError(eloc, "Cette variable de type est
+        contravariante et apparaît dans un position neutre."))
+
+(* Vérifie qu'une classe en position positive ou négative vérifie les règles de
+ * variance. Soulève une erreur si ce n'est pas le cas, ne rend rien sinon.
+ * context -> bool -> ident -> substitution -> unit *)
+let rec variance_classe env pos cid s = 
+  let c = classe_lookup env cid in
+  let f tptc =
+    begin match (subst_id env s (get_tptc_id tptc)) with
+      | Tclasse (cid, s) ->
+          begin match tptc.tptc_cont with
+            | TPTCplus tpt  ->
+                begin match get_variance env (Tclasse (cid, s)) with
+                  | Some (b, eloc) ->
+                      variance_tptc b eloc pos
+                  | None -> () (* TODO *)
+                end
+            | TPTCmoins tpt ->
+                begin match get_variance env (Tclasse (cid, s)) with
+                  | Some (b, eloc) ->
+                      variance_tptc b eloc (anti pos)
+                  | None -> () (* TODO *)
+                end
+            | TPTCrien tpt  -> () 
           end
-      | CVal (_, t) -> begin match variance env t with
-            | None -> ()
-            | Some (b, eloc) ->
-                if not b then
-                  raise (TypeError(eloc, "E03 : Cette variable de type est
-                  contravariante et apparaît dans un position positive"))
+      | _ -> ()
+    end
+  in List.iter f c.cc_tptcs
+
+(* Vérifie que les règles de variance sont vérifiées pour un objet de type tvar.
+ * Soulève une erreur si ce n'est pas le cas, ne rend rien sinon.
+ * context -> tvar -> unit *)
+let variance_var env tv = match tv.tv_cont with
+  | TVal (i, t, e) ->
+      begin match get_variance env t with
+        | None -> 
+            begin match t with
+              | Tclasse (cid, s) ->
+                  variance_classe env Pos cid s
+              | _ -> ()
+            end
+        | Some (b, eloc) ->
+            variance_tptc b eloc Pos
       end
-    ) env.vars
+  | TVar (i, t, e) ->
+      begin match get_variance env t with
+        | None -> ()
+        | Some (b, eloc) ->
+            variance_tptc b eloc Neutre
+      end
 
 (* context -> unit *)
 let variance_test_meths env = 
-  List.iter (fun tm -> match variance env tm.tm_res_type with
+  List.iter (fun tm -> match get_variance env tm.tm_res_type with
           | None -> ()
           | Some (b ,eloc) ->
               if not b then
                 raise (TypeError (eloc, "E04 : Cette variable est contravariante
                 et apparait dans une position positive"));
-          List.iter (fun tp -> begin match variance env tp.tp_typ with
+          List.iter (fun tp -> begin match get_variance env tp.tp_typ with
                 | None -> ()
                 | Some (b, eloc) ->
                     if b then
@@ -1082,6 +1141,8 @@ and type_var tro env v =
               tv_typ = ev'.te_typ;
               tv_loc = v.v_loc
             } in
+        (* Test de variance *)
+        variance_var env tv;
         (add_tvar_env env tv, tv) 
   end 
 
@@ -1620,7 +1681,6 @@ let type_classe env c =
     tc_env              = !gamma'
   } in let cc = context_classe_of_tclasse tc in
   (* Tests de variance *)
-  variance_test_vars !gamma';
   variance_test_meths !gamma';
   (* On remplace le tc0 qu'on a mis tout à l'heure par le nouveau tc. *)
   gamma := {
