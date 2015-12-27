@@ -90,7 +90,7 @@ let () =
 	localisation (Lexing.lexeme_start_p buf);
 	eprintf "Erreur syntaxique@.";
 	exit 1
-    | Typer.TypeError (l, s) ->
+    | Variance.TypeError (l, s) ->
         (* Erreur de typage. On affiche la localisation de l'erreur et un
          * message descriptif *)
         localisation2 l;

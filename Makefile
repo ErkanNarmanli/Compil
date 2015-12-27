@@ -1,4 +1,4 @@
-CMO=ppast.cmo lexer.cmo parser.cmo misc.cmo typer.cmo main.cmo
+CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo misc.cmo context.cmo substitution.cmo printing.cmo variance.cmo typer.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=main
 
