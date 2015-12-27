@@ -245,42 +245,57 @@ let var_lookup id env =
                                       aux q
     end in aux env.vars
 
-(* Indique si un type est issu d'un paramètre de type
- * covariant/contravariant/sans variance.
- * context -> loc -> typerType -> (bool, loc) option
+(* Indique si un type est issu d'un paramètre de type covariant /
+ * contravariant / sans variance.
+ * context -> (tparam_type_classe list) option -> typerType ->
+   * (bool * loc) option
  * covariant (+)     = Some (true, pos)
  * contravariant (-) = Some (false, pos)
- * sans variance     = None *)
-let get_variance env = function
-  | Tclasse(i, _) -> 
-      (* Seules les classes nous intéressent, lorsqu'on fait les vérifications,
-       * les classes ne sont pas encore instanciées. *)
-      (* On commence par aller chercher les paramètres de type de la classe dans
-       * laquelle on travaille. *)
-      let tptc_list = try begin match fst (var_lookup "this" env) with
-          | Tclasse(i', _) ->
-              let c = begin try
-                classe_lookup env i'
-              with
-                | Not_found -> failwith ("La classe \""^i'^"\"
-                n'existe pas")
-              end in
-              c.cc_tptcs
-          | _ -> []
-        end with
-          | Not_found -> []
-      (* Puis on va voir si "i" correspond à un de ces paramètres de type. *)
-      in let rec aux = function
-        | [] -> None
-        | tptc::q -> begin match tptc.tptc_cont with
-              | TPTCplus tpt ->
-                  if i = fst tpt.tpt_cont then Some (true, tpt.tpt_loc) else aux q
-              | TPTCmoins tpt ->
-                  if i = fst tpt.tpt_cont then Some (false, tpt.tpt_loc) else aux q
-              | TPTCrien  tpt ->
-                  if i = fst tpt.tpt_cont then None else aux q
-        end in aux tptc_list
-  | _ -> None
+ * sans variance     = None
+ * lo est éventuellement la liste des paramètres de type dans laquelle chercher
+ * la variance. Si lo = None, on devine cette liste à partir du type de 'this'.
+ * *)
+let rec get_variance' env lo t = match lo with
+  | Some tptcs ->
+      begin match t with
+        | Tclasse(i, _) -> 
+            let rec aux = function
+              | [] -> (None, tptcs)
+              | tptc::q -> begin match tptc.tptc_cont with
+                    | TPTCplus tpt ->
+                        if i = fst tpt.tpt_cont then
+                          (Some (true, tpt.tpt_loc), tptcs)
+                        else
+                          aux q
+                    | TPTCmoins tpt ->
+                        if i = fst tpt.tpt_cont then
+                          (Some (false, tpt.tpt_loc), tptcs)
+                        else
+                          aux q
+                    | TPTCrien  tpt ->
+                        if i = fst tpt.tpt_cont then
+                          (None, tptcs)
+                        else
+                          aux q
+              end in aux tptcs
+        | _ -> (None, tptcs)
+      end
+  | None ->
+      begin try
+        begin match fst (var_lookup "this" env) with
+          | Tclasse(cid, _) ->
+              let c = classe_lookup env cid in
+              get_variance' env (Some c.cc_tptcs) t
+          | _ -> failwith "var_lookup \"this\" env ne peut renvoyer qu'un classe."
+        end
+      with
+        | Not_found ->
+            failwith "On ne sait pas dans quelle classe aller chercher les
+            paramètres de type."
+      end
+
+(* Version abrégée. *)
+let get_variance env tptcs t = fst (get_variance' env (Some tptcs) t)
 
 (* Soulève une erreur si la variance et la position ne respectent pas les
  * règles.
@@ -305,70 +320,47 @@ let variance_tptc var eloc = function
 
 (* Vérifie qu'une classe en position positive ou négative vérifie les règles de
  * variance. Soulève une erreur si ce n'est pas le cas, ne rend rien sinon.
- * context -> bool -> ident -> substitution -> unit *)
-let rec variance_classe env pos cid s = 
-  let c = classe_lookup env cid in
+ * context -> (tparam_type_classe list) option -> position -> ident ->
+   * substitution -> unit *)
+let rec variance_classe env tptcs pos cid s = 
   let f tptc =
-    begin match (subst_id env s (get_tptc_id tptc)) with
-      | Tclasse (cid, s) ->
-          begin match tptc.tptc_cont with
-            | TPTCplus tpt  ->
-                begin match get_variance env (Tclasse (cid, s)) with
-                  | Some (b, eloc) ->
-                      variance_tptc b eloc pos
-                  | None -> () (* TODO *)
-                end
-            | TPTCmoins tpt ->
-                begin match get_variance env (Tclasse (cid, s)) with
-                  | Some (b, eloc) ->
-                      variance_tptc b eloc (anti pos)
-                  | None -> () (* TODO *)
-                end
-            | TPTCrien tpt  -> () 
-          end
-      | _ -> ()
+    let t = subst_id env s (get_tptc_id tptc) in
+    begin match tptc.tptc_cont with
+      | TPTCplus tpt  ->
+          variance_type env (Some tptcs) pos t
+      | TPTCmoins tpt ->
+          variance_type env (Some tptcs) (anti pos) t
+      | TPTCrien tpt  ->
+          variance_type env (Some tptcs) Neutre t
     end
-  in List.iter f c.cc_tptcs
+  in let c = classe_lookup env cid in
+  List.iter f c.cc_tptcs
+
+(* Indique si un type respecte les règles de variance.
+ * context -> (tparam_type_classe list) option -> position -> typerType ->
+   * unit. *)
+and variance_type env lo pos t =
+  let s = string_of_typ env t in
+  Printf.printf "Test de variance pour %s.\n" s;
+  let v, tptcs = get_variance' env lo t in
+  match v with
+    | None ->
+        begin match t with
+          | Tclasse (cid, s) ->
+              variance_classe env tptcs pos cid s
+          | _ -> ()
+        end
+    | Some (b, eloc) ->
+        variance_tptc b eloc pos
 
 (* Vérifie que les règles de variance sont vérifiées pour un objet de type tvar.
  * Soulève une erreur si ce n'est pas le cas, ne rend rien sinon.
  * context -> tvar -> unit *)
 let variance_var env tv = match tv.tv_cont with
-  | TVal (i, t, e) ->
-      begin match get_variance env t with
-        | None -> 
-            begin match t with
-              | Tclasse (cid, s) ->
-                  variance_classe env Pos cid s
-              | _ -> ()
-            end
-        | Some (b, eloc) ->
-            variance_tptc b eloc Pos
-      end
-  | TVar (i, t, e) ->
-      begin match get_variance env t with
-        | None -> ()
-        | Some (b, eloc) ->
-            variance_tptc b eloc Neutre
-      end
-
-(* context -> unit *)
-let variance_test_meths env = 
-  List.iter (fun tm -> match get_variance env tm.tm_res_type with
-          | None -> ()
-          | Some (b ,eloc) ->
-              if not b then
-                raise (TypeError (eloc, "E04 : Cette variable est contravariante
-                et apparait dans une position positive"));
-          List.iter (fun tp -> begin match get_variance env tp.tp_typ with
-                | None -> ()
-                | Some (b, eloc) ->
-                    if b then
-                      raise (TypeError (eloc, "E05 : Cette variable est
-                      covariante et apparaît dans une position négative"))
-                end) tm.tm_params
-    ) env.meths
-
+  | TVal (_, t, _) ->
+      variance_type env None Pos t
+  | TVar (_, t, _) ->
+      variance_type env None Neutre t
 
 (* ident -> tclasse -> tmethode *)
 let meth_lookup m_id env =
@@ -1155,8 +1147,15 @@ let pt_add env pt =
     cc_params = [];
     cc_deriv  = begin match snd pt.pt_cont with
         | None          -> None 
-        | Some (Hinf t) -> None 
-        | Some (Hsup t) -> Some (typerType_of_typ env t, [])
+        | Some (Hinf t) ->
+            let t' = typerType_of_typ env t in
+            print_endline ("ici : "^t.t_name^".");
+            variance_type env None Pos t';
+            None 
+        | Some (Hsup t) ->
+            let t' =  typerType_of_typ env t in
+            variance_type env None Neg t';
+            Some (t', [])
     end ;
     cc_env = env (* whatev's *)
   } in begin match snd pt.pt_cont with
@@ -1165,12 +1164,15 @@ let pt_add env pt =
   end
 
 (* Vérifie si un paramètre est bien formé dans l'environnement env renvoie un
- * environnement étendu avec de paramètre comme val.
+ * environnement étendu avec de paramètre comme val. Si le booléen in_meth est à
+ * true, on effectue en plus le test de variance.
  * context -> parametre -> context *)
-let check_param env p =
+let check_param in_meth env p =
   let p_type = typerType_of_typ env p.p_typ in
   match is_bf env p.p_loc p_type with
     | None ->
+        if in_meth then
+          variance_type env None Neg p_type;
         add_var_env env (CVal (p.p_name, p_type))
     | Some eloc ->
         raise (TypeError (eloc, "Le type de ce paramètre n'est pas bien formé.")) 
@@ -1378,9 +1380,11 @@ let type_decl (env, tdl) d = match d.decl_cont with
       let gamma'' = ref env in
       (* On ajoute les paramètres de type comme des classes. *)
       gamma'' :=  List.fold_left pt_add !gamma'' (get_meth_type_params m);
-      (* On vérifie que les types des argument sont bien formés et on ajoute les
-       * arguments à l'environnement. *)
-      gamma'' :=  List.fold_left check_param !gamma'' (get_meth_params m);
+      (* On vérifie que les types des argument sont bien formés et qu'ils
+       * vérifient les conditions de variance puis on ajoute les arguments
+       * à l'environnement. *)
+      gamma'' := 
+        List.fold_left (check_param true) !gamma'' (get_meth_params m);
       (* On calcule le type de retour de la méthode *)
       let tau = begin match m.m_cont with
         | Mblock mb ->  Tunit
@@ -1393,6 +1397,8 @@ let type_decl (env, tdl) d = match d.decl_cont with
                 | None -> tau
             end
       end in
+      (* On effectue le test de variance sur le type de retour. *)
+      variance_type !gamma'' None Pos tau;
       (* On ajoute la méthode à gamma'' *)
       let tm = begin match m.m_cont with 
         | Mblock mb -> {
@@ -1476,47 +1482,6 @@ let type_decl (env, tdl) d = match d.decl_cont with
       (* On calcule enfin l'envirronement de retour. *)
       (add_tmeth_env env tm', (TDmeth tm')::tdl)  
       
-(* context -> param_type_classe  -> context *)
-let ptc_add env ptc = match get_ptc_borne ptc with
-  | None -> add_classe_env env {
-              cc_name   = get_ptc_id ptc;
-              cc_tptcs  = [];
-              cc_params = [];
-              cc_deriv  = None;
-              cc_env    = env (* On ne s'en sert jamais. *)
-      }
-  | Some (Hsup tau) ->
-      let tau' = typerType_of_typ env tau in 
-      begin match is_bf env tau.t_loc tau' with
-        | None ->
-            add_classe_env env {
-                  cc_name   = get_ptc_id ptc;
-                  cc_tptcs  = [];
-                  cc_params = [];
-                  cc_deriv  = Some (tau', []);
-                  cc_env    = env (* FIXME : ajouter les méthodes dont on
-                  hérite...*)
-            }
-        | Some eloc -> raise (TypeError (eloc, "Le type de la borne est mal
-            formé à l'endroit indiqué"))
-      end
-  | Some (Hinf tau) ->
-      let tau' = typerType_of_typ env tau in 
-      begin match is_bf env tau.t_loc tau' with
-        | None ->
-            add_constr_env (add_classe_env env {
-                  cc_name   = get_ptc_id ptc;
-                  cc_tptcs  = [];
-                  cc_params = [];
-                  cc_deriv  = None;
-                  cc_env    = env (* On ne s'en sert jamais. *)
-            }) (get_ptc_id ptc, tau')
-        | Some eloc ->
-            raise (TypeError (eloc, "La borne de ce parametre de type n'est
-            pas bien formee à l'endroit indiqué."))
-      end
-      
-  
 (* env -> param_type_classe -> toparam_type_classe *)
 let tptc_of_ptc env ptc = 
   let cont = match ptc.ptc_cont with
@@ -1553,6 +1518,51 @@ let tptc_of_ptc env ptc =
     tptc_loc  = ptc.ptc_loc
   }
 
+(* context -> context_classe -> param_type_classe  -> context *)
+let ptc_add (env, tptcs) ptc = match get_ptc_borne ptc with
+  | None ->
+      let env' = add_classe_env env {
+              cc_name   = get_ptc_id ptc;
+              cc_tptcs  = [];
+              cc_params = [];
+              cc_deriv  = None;
+              cc_env    = env (* On ne s'en sert jamais. *)
+      } in (env', (tptc_of_ptc env ptc)::tptcs)
+  | Some (Hsup tau) ->
+      let tau' = typerType_of_typ env tau in 
+      variance_type env (Some tptcs) Pos tau';
+      begin match is_bf env tau.t_loc tau' with
+        | None ->
+            let env' =  add_classe_env env {
+                  cc_name   = get_ptc_id ptc;
+                  cc_tptcs  = [];
+                  cc_params = [];
+                  cc_deriv  = Some (tau', []);
+                  cc_env    = env (* FIXME : ajouter les méthodes dont on
+                  hérite...*)
+            } in (env', (tptc_of_ptc env ptc)::tptcs)
+        | Some eloc -> raise (TypeError (eloc, "Le type de la borne est mal
+            formé à l'endroit indiqué"))
+      end
+  | Some (Hinf tau) ->
+      let tau' = typerType_of_typ env tau in 
+      variance_type env (Some tptcs) Neg tau';
+      begin match is_bf env tau.t_loc tau' with
+        | None ->
+            let env' =  add_constr_env (add_classe_env env {
+                  cc_name   = get_ptc_id ptc;
+                  cc_tptcs  = [];
+                  cc_params = [];
+                  cc_deriv  = None;
+                  cc_env    = env (* On ne s'en sert jamais. *)
+            }) (get_ptc_id ptc, tau') in
+            (env', (tptc_of_ptc env ptc)::tptcs)
+        | Some eloc ->
+            raise (TypeError (eloc, "La borne de ce parametre de type n'est
+            pas bien formee à l'endroit indiqué."))
+      end
+      
+  
 (* context -> parametre -> tparametre *)
 let tparam_of_param env p = 
   {
@@ -1586,13 +1596,15 @@ let type_classe env c =
   (* On declare des environnements mutables pour ne pas se perde *)
   let gamma  = ref env in
   let gamma' = ref env in
-  (* 1. On checke les paramètre de type et on les ajoute à l'env *)
-  gamma' := List.fold_left ptc_add !gamma' (get_list c.type_class_params);
+  (* 1. On checke les paramètres de type et on les ajoute à l'env *)
+  let new_env, tptcs' = 
+    List.fold_left ptc_add (!gamma', []) (get_list c.type_class_params) in
+  gamma' := new_env;
+  let tptcs = List.rev tptcs' in
   (* 2. On vérifie que le type dont on hérite est bien formé et on l'ajoute à
    * l'environnement. *)
-  let (tptcs, tps, td) = begin match c.deriv with
+  let (tps, td) = begin match c.deriv with
     | None -> (
-        List.map (tptc_of_ptc !gamma') (get_list c.type_class_params),
         List.map (tparam_of_param !gamma') (get_list c.params),
         None
       )
@@ -1600,6 +1612,8 @@ let type_classe env c =
         let tau = typerType_of_typ !gamma' t in
         begin match is_bf !gamma' t.t_loc tau with
           | None ->
+              (* On effectue les tests de variance *)
+              variance_type !gamma' (Some tptcs) Pos tau;
               begin match tau with
                 | Tclasse (cid, s) ->
                     (* On va chercher dans l'environnement la classe dont on
@@ -1631,7 +1645,6 @@ let type_classe env c =
               indiqué."));
         end;
         (
-          List.map (tptc_of_ptc !gamma') (get_list c.type_class_params),
           List.map (tparam_of_param !gamma') (get_list c.params),
           Some (tau, List.map (type_expr !gamma' None) (get_list es_o))
         )
@@ -1649,7 +1662,7 @@ let type_classe env c =
   gamma' := add_classe_env !gamma' tc0;
   (* 3. On vérifie que le type des parametres sont bien formés et on les ajoute
    * à l'envrionnement de la classe. *)
-  gamma' := List.fold_left check_param !gamma' (get_list c.params);
+  gamma' := List.fold_left (check_param false) !gamma' (get_list c.params);
   (* Et le this, on calcule la substitution une bonne fois pour toute ici. *)
   let newtyps = List.map
                   (fun ptc -> Tclasse (get_ptc_id ptc, subst0 ()))
@@ -1680,8 +1693,6 @@ let type_classe env c =
     tc_loc              = c.c_loc;
     tc_env              = !gamma'
   } in let cc = context_classe_of_tclasse tc in
-  (* Tests de variance *)
-  variance_test_meths !gamma';
   (* On remplace le tc0 qu'on a mis tout à l'heure par le nouveau tc. *)
   gamma := {
     classes = replace_in_list
