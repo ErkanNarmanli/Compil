@@ -83,3 +83,132 @@ let subst s = function
  * subst_id -> context -> substitution -> ident -> typerType *)
 let subst_id s id = subst s (Tclasse (id, subst0 ()))
 
+(* Substitution de tous les types dans un accès.
+ * substitution -> tacces -> tacces. *)
+let rec subst_acc s a = match a.ta_cont with
+  | TAident _ -> a
+  | TAexpr_ident (e, i) ->
+      {
+        ta_cont = TAexpr_ident (subst_expr s e, i);
+        ta_loc = a.ta_loc
+      }
+
+(* Substitution de tous les types qui apparaissent dans une expression...
+ * Oui c'est violent, mais on n'a pas trouvé de meilleure solution.
+ * substitution -> texpr -> texpr *)
+and subst_expr s e =
+  let cont = match e.te_cont with
+    | TEvoid | TEthis | TEnull | TEint _ | TEstr _ | TEbool _ ->
+        e.te_cont
+    | TEacc a ->
+        TEacc (subst_acc s a)
+    | TEacc_exp (a, e') ->
+        TEacc_exp (subst_acc s a, subst_expr s e')
+    | TEacc_typ_exp (a, targst, es) ->
+        let a' = subst_acc s a in
+        let targst' = {
+          tat_cont = List.map (subst s) targst.tat_cont;
+          tat_loc = targst.tat_loc;
+        } in
+        let es' = List.map (subst_expr s) es in
+        TEacc_typ_exp (a', targst', es')
+    | TEnew (i, targst, es) ->
+        let targst' = {
+          tat_cont = List.map (subst s) targst.tat_cont;
+          tat_loc = targst.tat_loc;
+        } in
+        let es' = List.map (subst_expr s) es in
+        TEnew (i, targst', es')
+    | TEneg e' ->
+        TEneg (subst_expr s e')
+    | TEmoins e' ->
+        TEmoins (subst_expr s e')
+    | TEbinop (b, e1, e2) ->
+        TEbinop (b, subst_expr s e1, subst_expr s e2)
+    | TEifelse (eb, e1, e2) ->
+        TEifelse (subst_expr s eb, subst_expr s e1, subst_expr s e2)
+    | TEwhile (eb, e') ->
+        TEwhile (subst_expr s eb, subst_expr s e')
+    | TEreturn None ->
+        e.te_cont
+    | TEreturn (Some e') ->
+        TEreturn (Some (subst_expr s e'))
+    | TEprint e' ->
+        TEprint (subst_expr s e')
+    | TEbloc b ->
+        TEbloc (subst_bloc s b)
+  in
+  {
+    te_cont = cont;
+    te_loc = e.te_loc;
+    te_typ = subst s e.te_typ
+  }
+
+(* Substitue tous les types dans un bloc.
+ * substitution -> tbloc -> tbloc *)
+and subst_bloc s = function
+  | [] -> []
+  | (TIvar v) :: b ->
+      let v' = subst_tvar s v in
+      (TIvar v') :: (subst_bloc s b)
+  | (TIexpr e) :: b ->
+      (TIexpr (subst_expr s e)) :: (subst_bloc s b)
+
+(* Substitue tous les types dans une variable.
+ * substitution -> tvar -> tvar *)
+and subst_tvar s v =
+  let cont = begin match v.tv_cont with
+    | TVal (i, t, e) ->
+        TVal (i, subst s t, subst_expr s e)
+    | TVar (i, t, e) ->
+        TVar (i, subst s t, subst_expr s e)
+  end in
+  {
+    tv_cont = cont;
+    tv_typ = subst s v.tv_typ;
+    tv_loc = v.tv_loc;
+  }
+
+(* Substitue tous les types dans un paramètre de type. 
+ * substitution -> tparam_type -> tparam_type *)
+let subst_tpt s tpt =
+  let cont =
+    let (i, h) = tpt.tpt_cont in
+    let h' = match h with
+      | None -> None
+      | Some (HTinf t) -> Some (HTinf (subst s t))
+      | Some (HTsup t) -> Some (HTsup (subst s t))
+    in (i, h')
+  in
+  {
+    tpt_cont = cont;
+    tpt_loc = tpt.tpt_loc;
+  }
+
+(* Substitue tous les types dans une paramètre de type de classe.
+ * substitution -> tparam_type_classe -> tparam_type_classe *)
+let subst_tptc s tptc = 
+  let cont = match tptc.tptc_cont with
+    | TPTCplus tpt  -> TPTCplus (subst_tpt s tpt)
+    | TPTCmoins tpt -> TPTCmoins (subst_tpt s tpt)
+    | TPTCrien tpt  -> TPTCrien (subst_tpt s tpt)
+  in {
+    tptc_cont = cont;
+    tptc_loc = tptc.tptc_loc;
+  }
+
+(* Substitue tous les types dans un paramètre.
+ * substitution -> tparametre -> tparametre *)
+let subst_param s p = {
+  tp_name = p.tp_name;
+  tp_typ = subst s p.tp_typ;
+  tp_loc = p.tp_loc;
+}
+
+(* Idem que la fonction précédente mais pour une variable de contexte.
+ * substitution -> context_var -> context_var *)
+let subst_cvar s = function
+  | CVar(i, t) -> CVar (i, subst s t)
+  | CVal(i, t) -> CVal (i, subst s t)
+
+

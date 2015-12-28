@@ -145,7 +145,6 @@ and texprCont =
     | TEneg      of texpr
     | TEmoins    of texpr
     | TEbinop    of tbinop * texpr * texpr 
-    | TEif       of texpr * texpr
     | TEifelse   of texpr * texpr * texpr
     | TEwhile    of texpr * texpr
     | TEreturn   of texpr option

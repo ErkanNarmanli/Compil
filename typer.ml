@@ -1032,7 +1032,7 @@ let can_override env m1 m2 =
           (* On vérifie l'alpha équivalence des types des paramètres et la
            * compatibilité des types de retour. *)
           let cset = alpha_eq m1 m2 in
-          (* On substuitue dans le type de retour de m2 puis on vérifie le
+          (* On substitue dans le type de retour de m2 puis on vérifie le
            * sous-typage. *)
           let tr1 = m1.tm_res_type in
           let tr2 = alpha_subst cset m2.tm_res_type in
@@ -1226,6 +1226,63 @@ let tptc_of_ptc env ptc =
     tptc_loc  = ptc.ptc_loc
   }
 
+(* Adapte une variable héritée à la classe fille.
+ * substitution -> context_var -> context_var *)
+let update_var = subst_cvar
+
+(* Adapte une contrainte d'un environnement de méthode héritée à la classe
+ * fille.
+ * substitution -> constr -> constr *)
+let update_constr s (i, t) = (i, subst s t)
+
+(* Adapte une classe d'un environnement de classe héritée à la classe fille.
+ * substitution -> context_classe -> context_classe *)
+let rec update_classe s c = {
+  cc_name = c.cc_name;
+  cc_tptcs = List.map (subst_tptc s) c.cc_tptcs;
+  cc_params = List.map (subst_param s) c.cc_params;
+  cc_deriv =
+    begin match c.cc_deriv with
+      | None -> None
+      | Some (t, es) -> 
+          Some (subst s t, List.map (subst_expr s) es)
+    end;
+  cc_env = update_env s c.cc_env;
+}
+
+(* Adapte l'environnement d'une méthode héritée en vue de l'ajout à une classe
+ * fille.
+ * substitution -> context -> context *)
+and update_env s env = {
+  classes = List.map (update_classe s) env.classes;
+  constrs = List.map (update_constr s) env.constrs; 
+  vars    = List.map (update_var s) env.vars;
+  meths   = List.map (update_meth s) env.meths;
+}
+
+(* Adapte les méthodes héritées pour les ajouter à l'environnement d'une classe.
+ * substitution -> tmethode -> tmethode  *)
+and update_meth s m = 
+  let subst_param p = {
+    tp_name = p.tp_name;
+    tp_typ = subst s p.tp_typ;
+    tp_loc = p.tp_loc;
+  } in
+  let params = List.map subst_param m.tm_params in
+  let res_type = subst s m.tm_res_type in
+  let res_expr = subst_expr s m.tm_res_expr in
+  let env = update_env s m.tm_env in
+  {
+    tm_name         = m.tm_name;
+    tm_override     = m.tm_override;
+    tm_type_params  = m.tm_type_params;
+    tm_params       = params;
+    tm_res_type     = res_type;
+    tm_res_expr     = res_expr;
+    tm_loc          = m.tm_loc;
+    tm_env          = env;
+  }
+
 (* context -> context_classe -> param_type_classe  -> context *)
 let ptc_add (env, tptcs) ptc = match get_ptc_borne ptc with
   | None ->
@@ -1241,13 +1298,27 @@ let ptc_add (env, tptcs) ptc = match get_ptc_borne ptc with
       variance_type env (Some tptcs) Pos tau';
       begin match is_bf env tau.t_loc tau' with
         | None ->
+            (* On va chercher la classe dont on hérite. *)
+            let c, s = begin match tau' with
+              | Tclasse (cid, s) ->
+                  (classe_lookup env cid, s)
+              | _ ->
+                  failwith ("On ne doit pas arriver ici non ?")
+            end in
+            (* On va chercher les méthodes et variables de cette classe. *)
+            let add_meths = List.map (update_meth s) c.cc_env.meths in
+            let add_vars = List.map (subst_cvar s) c.cc_env.vars in
+            (* On crée un environnement qui contient ces variables et méthodes
+             * pour la classe qu'on va ajouter. *)
+            let sub_env = List.fold_left add_tmeth_env env add_meths in
+            let sub_env' = List.fold_left add_var_env sub_env add_vars in
+            (* Et on ajoute enfin la classe à l'environnement. *)
             let env' =  add_classe_env env {
                   cc_name   = get_ptc_id ptc;
                   cc_tptcs  = [];
                   cc_params = [];
                   cc_deriv  = Some (tau', []);
-                  cc_env    = env (* FIXME : ajouter les méthodes dont on
-                  hérite...*)
+                  cc_env    = sub_env';
             } in (env', (tptc_of_ptc env ptc)::tptcs)
         | Some eloc ->
             raise (TypeError (eloc, "Le type de la borne est mal formé à "^
@@ -1279,39 +1350,6 @@ let tparam_of_param env p =
     tp_typ  = typerType_of_typ env p.p_typ;
     tp_loc = p.p_loc
   }  
-
-(* Adapte les méthodes héritées pour les ajouter à l'environnement d'une classe.
- * sig *)
-let update_meth env tptcs typs m = 
-  let rec find id = function
-    | ([], []) -> None
-    | (tptc::q1, t::q2) ->
-        if get_tptc_id tptc = id then
-          Some t
-        else
-          find id (q1, q2)
-    | _ -> 
-        failwith "On n'arrive pas là." in
-  let f c = begin match find c.cc_name (tptcs, typs) with
-    | None -> Some c
-    | Some t ->
-        begin match t with
-          | Tclasse (cid, _) ->
-              Some (classe_lookup env cid)
-          | _ -> None
-        end
-  end in
-  let cs = filter_map f m.tm_env.classes in
-  {
-    tm_name         = m.tm_name;
-    tm_override     = m.tm_override;
-    tm_type_params  = m.tm_type_params;
-    tm_params       = m.tm_params;
-    tm_res_type     = m.tm_res_type;
-    tm_res_expr     = m.tm_res_expr;
-    tm_loc          = m.tm_loc;
-    tm_env          = set_classes cs m.tm_env;
-  }
 
 (* typage des classes
  * context -> classe -> (context * tclasse) *) 
@@ -1368,17 +1406,12 @@ let type_classe env c =
                     end in
                     (* On ajoute les méthodes et variables héritées à gamma'.
                      * Attention, l'ajout des méthodes est délicat. *)
-                    let tptcs' = c'.cc_tptcs in
-                    let typs = List.map
-                      (fun tptc -> subst_id s (get_tptc_id tptc))
-                      tptcs' in
-                    let add_meths =
-                      List.map (update_meth !gamma' tptcs' typs)
-                      c'.cc_env.meths in
+                    let add_meths = List.map (update_meth s) c'.cc_env.meths in
+                    let add_vars = List.map (subst_cvar s) c'.cc_env.vars in
                     gamma' := {
                       classes = !gamma'.classes;
                       constrs = !gamma'.constrs;
-                      vars    = c'.cc_env.vars @ (!gamma'.vars);
+                      vars    = add_vars @ (!gamma'.vars);
                       meths   = add_meths @ (!gamma'.meths);
                       }
                 (* Si on essaie d'hériter d'autre chose que d'une classe, on

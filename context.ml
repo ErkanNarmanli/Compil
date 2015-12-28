@@ -37,14 +37,6 @@ let add_classe_env env c =
     meths   = env.meths
   }
 
-(* Définit un autre ensemble de classes. *)
-let set_classes new_c env = {
-  classes = new_c;
-  constrs = env.constrs;
-  vars    = env.vars;
-  meths   = env.meths;
-}
-
 (* Ajoute une contrainte a un environnement
  * context -> (ident * typerType) -> context *)
 let add_constr_env env constr = 
