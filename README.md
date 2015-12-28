@@ -17,21 +17,16 @@ un AST lors de l'analyse syntaxique et un AST typé (TAST) lors du typage.
 -------------
 ### Pour le moment on a
 * Un lexer/parser qui passe tous les tests.
-* Un typer qui passe 75%.
+* Un typer qui passe 95% des tests.
 
 ### Reste à faire
 
-* Faire un fichier misc.ml pour y mettre toutes les fonctions auxiliaires, en  profiter pour transformer `tast.ml` en `tast.mli` ;
-* Retirer le constructeur de types `TMbloc`, qui, vu qu'on a traité le sucre  syntaxique des blocs, ne sert plus a rien ;
-* Vérifier les conditions d'existence et d'unicité ;
-* Faire les vérification de la variance, on a commencé à faire quelque cas,
-  qu'il faudra de toute façon retirer mais qui permettent de filtrer certains tests.
-* Implémenter la fonction qui vérifie que l'on peut surcharger une méthode. Pour le moment on a un début
-de fonction et toutes les idées pour implémenter le reste.
+* Le typeur comporte encore quelques bugs à régler.
+* La génération de code.
 
 ### Difficultés rencontrées
 
-* Un code un peu trop verbeux, dû a notre AST et TAST un poil trop complexe. On  s'est aussi rendu compte un peu trop tard qu'on aurait pu simplifier quelques éléments des AST et TAST en traitant le  sucre syntaxique dans le parseur.
+* Un code un peu trop verbeux, dû a notre AST et TAST un poil trop complexe. On  s'est aussi rendu compte un peu trop tard qu'on aurait pu simplifier quelques éléments des AST et TAST en traitant le  sucre syntaxique dans le parseur. 
 * On s'est apperçu trop tard que l'on avait pas besoin de toute l'information
   sur les objets que l'on gardait dans le contexte. On y conserve beaucoup trop
-d'information.
+  d'information. Ça a été réglé après mais nous a pas mal ralenti.
