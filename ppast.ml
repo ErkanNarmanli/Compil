@@ -59,28 +59,16 @@ and print_var v = match v.v_cont with
                             print_string " =" ;
                             print_expr e
 
-and print_methode m = match m.m_cont with 
-    | Mblock mb -> print_meth_bloc mb
-    | Mexpr me  -> print_meth_expr me
-
-and print_meth_bloc mb =
-    if mb.mb_override then print_string "override " ;
+and print_methode m =
+    if m.m_override then print_string "override " ;
     print_string "def " ;
-    print_ident mb.mb_name ;
-    print_list_o print_param_type " [" ", " "]" mb.mb_type_params ;
-    print_list print_parametre " (" ", " ")" mb.mb_params ;
-    print_bloc mb.bloc
-    
-and print_meth_expr me =
-    if me.me_override then print_string "override " ;
-    print_string "def " ;
-    print_ident me.me_name ;
-    print_list_o print_param_type " [" ", " "]" me.me_type_params ;
-    print_list print_parametre " (" ", " ")" me.me_params ;
+    print_ident m.m_name ;
+    print_list_o print_param_type " [" ", " "]" m.m_type_params ;
+    print_list print_parametre " (" ", " ")" m.m_params ;
     print_string " : " ;
-    print_typ me.res_type ;
+    print_typ m.m_res_type ;
     print_string " = " ;
-    print_expr me.res_expr
+    print_expr m.m_res_expr
 
 and print_parametre p = 
     print_ident p.p_name ;
@@ -124,10 +112,12 @@ and print_expr e = match e.e_cont with
     | Eacc_exp (acc, e) -> print_acces acc;
                            print_string " = ";
                            print_expr e
-    | Eacc_typ_exp (a, argt, es) -> print_acces a; 
-                                    print_char ' ';
-                                    print_arguments_type argt;
-                                    print_list print_expr "(" ", " ")" es
+    | Eacc_typ_exp (e', mid, argt, es) ->
+        print_expr e'; 
+        print_char '.';
+        print_string mid;
+        print_arguments_type argt;
+        print_list print_expr "(" ", " ")" es
     | Enew (id, argt, es) -> Printf.printf "new %s " id;
                              print_arguments_type argt;
                              print_list print_expr " (" ", " ")" es
@@ -137,11 +127,6 @@ and print_expr e = match e.e_cont with
                            print_char ' ';
                            print_binop b;
                            print_char ' '; 
-                           print_expr e2
-    | Eif (e1, e2)      -> print_string "if (";
-                           print_expr e1;
-                           print_string ") then\n";
-                           print_string "\t";
                            print_expr e2
     | Eifelse (e1, e2, e3) -> print_string "if (";
                              print_expr e1;

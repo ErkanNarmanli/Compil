@@ -32,27 +32,14 @@ and varCont =
     | Var   of ident * (typ option) * expr
 
 and methode = {
-    m_cont  : methodeCont ;
-    m_loc   : loc ; }
-
-and methodeCont = (*localisé dans meth_block et meth_expr*)
-    | Mblock of meth_block 
-    | Mexpr  of meth_expr
-
-and meth_block = {
-    mb_name         : ident ;
-    mb_override     : bool ;
-    mb_type_params  : (param_type list) option ;
-    mb_params       : parametre list ;
-    bloc            : bloc ; }
-
-and meth_expr = {
-    me_name         : ident ;
-    me_override     : bool ;
-    me_type_params  : (param_type list) option ;
-    me_params       : parametre list ;
-    res_type        : typ ;
-    res_expr        : expr; }
+    m_name        : ident;
+    m_override    : bool;
+    m_type_params : (param_type list) option ;
+    m_params      : parametre list ;
+    m_res_type    : typ ;
+    m_res_expr    : expr;
+    m_loc         : loc
+}
 
 and parametre = {
     p_name      : ident ;
@@ -105,12 +92,11 @@ and exprCont =
     | Ebool     of bool
     | Eacc      of acces
     | Eacc_exp      of acces * expr
-    | Eacc_typ_exp  of acces * arguments_type * expr list
+    | Eacc_typ_exp  of expr * ident * arguments_type * expr list
     | Enew      of ident * arguments_type * expr list
     | Eneg      of expr
     | Emoins    of expr
     | Ebinop    of binop * expr * expr 
-    | Eif       of expr * expr
     | Eifelse   of expr * expr * expr
     | Ewhile    of expr * expr
     | Ereturn   of expr option

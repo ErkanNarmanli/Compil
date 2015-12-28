@@ -104,14 +104,14 @@ and subst_expr s e =
         TEacc (subst_acc s a)
     | TEacc_exp (a, e') ->
         TEacc_exp (subst_acc s a, subst_expr s e')
-    | TEacc_typ_exp (a, targst, es) ->
-        let a' = subst_acc s a in
+    | TEacc_typ_exp (e', mid, targst, es) ->
+        let e'' = subst_expr s e' in
         let targst' = {
           tat_cont = List.map (subst s) targst.tat_cont;
           tat_loc = targst.tat_loc;
         } in
         let es' = List.map (subst_expr s) es in
-        TEacc_typ_exp (a', targst', es')
+        TEacc_typ_exp (e'', mid, targst', es')
     | TEnew (i, targst, es) ->
         let targst' = {
           tat_cont = List.map (subst s) targst.tat_cont;

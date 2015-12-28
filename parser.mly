@@ -121,25 +121,35 @@ var:
 methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; b = bloc
-                {{  m_cont          = Mblock {
-                    mb_name         = id    ;
-                    mb_override     = o     ;
-                    mb_type_params  = pts   ;
-                    mb_params       = ps    ;
-                    bloc            = b
-                } ; m_loc           = ($startpos, $endpos)
+                {
+                  let l = fst b.bl_loc in
+                  let res_type = {
+                    t_name = "Unit";
+                    args_type = {
+                      at_cont = None;
+                      at_loc  = (l, l);
+                    };
+                    t_loc = (l, l);
+                  } in {
+                    m_name        = id;
+                    m_override    = o     ;
+                    m_type_params = pts   ;
+                    m_params      = ps    ;
+                    m_res_type    = res_type;
+                    m_res_expr    = {e_cont = Ebloc b; e_loc = b.bl_loc};
+                    m_loc         = ($startpos, $endpos)
                 }}
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; CONS;
         t = typ; EQUAL; e = expr
-                {{  m_cont          = Mexpr {
-                    me_name         = id    ;
-                    me_override     = o     ;
-                    me_type_params  = pts   ;
-                    me_params       = ps    ;
-                    res_type        = t     ;
-                    res_expr        = e
-                } ; m_loc           = ($startpos, $endpos)
+                {{
+                  m_name        = id    ;
+                  m_override    = o     ;
+                  m_type_params = pts   ;
+                  m_params      = ps    ;
+                  m_res_type    = t     ;
+                  m_res_expr    = e;
+                  m_loc         = ($startpos, $endpos)
                 }}
 ;
 
@@ -206,15 +216,32 @@ expr:
             {{ e_cont = Eacc a; e_loc = ($startpos, $endpos) }}
     | a = acces; EQUAL; e = expr
             {{ e_cont = Eacc_exp (a, e); e_loc = ($startpos, $endpos) }}
+    (* Suvre syntaxique pour l'appel de méthodes sans expression :
+      * m[...](...) -> this.m[...](...) *)
     | a = acces; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
-            {{ e_cont = Eacc_typ_exp (a, argst, exprs); e_loc =
+            {
+              let (e, mid) = match a.a_cont with
+                | Aident mid ->
+                    let l = fst a.a_loc in
+                    let this = {e_cont = Ethis; e_loc = (l, l)} in
+                    (this, mid)
+                | Aexpr_ident (e, mid) -> (e, mid)
+              in
+              { e_cont = Eacc_typ_exp (e, mid, argst, exprs); e_loc =
                 ($startpos,$endpos) }}
     | NEW; id = IDENT; argst = arguments_type; LPAR;
             exprs = separated_list(COMMA, expr); RPAR
             {{ e_cont = Enew (id, argst, exprs); e_loc = ($startpos, $endpos) }}
+    (* Sucre syntaxique pour le if sans else. *)
     | IF; LPAR; e1 = expr; RPAR; e2 = expr
-            {{ e_cont = Eif (e1, e2); e_loc = ($startpos, $endpos) }} %prec IF
+            {{
+              e_cont = Eifelse (e1, e2, {
+                  e_cont = Evoid;
+                  e_loc = ($endpos, $endpos)
+              });
+              e_loc = ($startpos, $endpos)
+            }} %prec IF
     | IF; LPAR; e1 = expr; RPAR; e2 = expr; ELSE; e3 = expr
             {{ e_cont =  Eifelse (e1, e2, e3); e_loc = ($startpos, $endpos) }}
     | RETURN; e = expr      

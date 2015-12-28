@@ -140,7 +140,7 @@ and texprCont =
     | TEbool     of bool
     | TEacc      of tacces
     | TEacc_exp      of tacces * texpr
-    | TEacc_typ_exp  of tacces * targuments_type * texpr list
+    | TEacc_typ_exp  of texpr * ident * targuments_type * texpr list
     | TEnew      of ident * targuments_type * texpr list
     | TEneg      of texpr
     | TEmoins    of texpr

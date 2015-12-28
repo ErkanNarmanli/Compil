@@ -89,20 +89,8 @@ let get_ptc_borne_list c = match c.type_class_params with
   | None -> []
   | Some l -> List.map get_ptc_borne l
 
-(* methode -> tparams *)
-let get_meth_params m = match m.m_cont with 
-  | Mblock mb -> mb.mb_params
-  | Mexpr me  -> me.me_params
-
 (* methode -> param_type list *)
-let get_meth_type_params m = match m.m_cont with
-  | Mblock mb -> get_list mb.mb_type_params
-  | Mexpr  me -> get_list me.me_type_params
-
-(* methode -> ident *)
-let get_meth_id m = match m.m_cont with
-  | Mblock mb ->  mb.mb_name
-  | Mexpr me  ->  me.me_name 
+let get_meth_type_params m = get_list m.m_type_params
 
 (* var -> ident *)
 let get_var_id v = match v.v_cont with

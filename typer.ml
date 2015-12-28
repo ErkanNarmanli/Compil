@@ -509,14 +509,6 @@ let rec type_expr env tro e = match e.e_cont with
       else
         raise (TypeError (e.e_loc, "Le type de retour est mal défini : les "^
         "cas if et else ont des types incompatibles."))
-  (* Le sucre syntaxique : 
-   * On se ramène au cas précédent avec un () pour le deuxième argument
-   * (Evoid chez nous) *)
-  | Eif(eb, e1) ->
-      type_expr env tro {
-        e_cont = Eifelse (eb,e1,{e_cont = Evoid; e_loc = e.e_loc});
-        e_loc = e.e_loc
-      }
   (* Boucle while (eb) e1 *)
   | Ewhile (eb, e1) ->    
       (* Il suffit juste que eb soit booléenne et que e1 soit bien typée. *)
@@ -586,106 +578,85 @@ let rec type_expr env tro e = match e.e_cont with
             raise (TypeError (eloc, "Le type de cette expression est "^
             "incompatible avec la classe."))
       end
-  | Eacc_typ_exp (a, argst, es) ->
-      begin match a.a_cont with
-        | Aident m ->
-            (* Le sucre syntaxique : m tout seul signifie this.x.
-             * On s'en sort avec un appel récursif sur l'autre cas. *) 
-            let this = {
-              e_cont = Ethis;
-              e_loc = a.a_loc
-            } in
-            let new_a = {
-              a_cont = Aexpr_ident (this, m);
-              a_loc = a.a_loc
-            } in
-            type_expr env tro {
-              e_cont = Eacc_typ_exp (new_a, argst, es);
-              e_loc = e.e_loc
-            }
-        | Aexpr_ident (e', m_id) ->
-            (* On commence par typer l'expression qui appelle la
-             * méthode et on vérifie que c'est une instance de classe. *) 
-            let e'' = type_expr env tro e' in
-            let (cid,s) = begin match e''.te_typ with
-              | Tclasse(cid, s) -> (cid,s)
-              | _ ->
-                  raise (TypeError (a.a_loc, "Cette expression n'est pas une "^
-                  "instance d'une classe, elle ne peut pas avoir de méthode."))
-            end in
-            let c = classe_lookup env cid in
-            (* On va chercher la méthode dans l'environnement de la classe. *)
-            let m = begin try meth_lookup m_id c.cc_env  with
-              (* Si la méthode a été typée récemment, elle n'est pas encore
-               * dans c.cc_env mais elle est dans env *)
-              | Not_found ->
-                  begin try
-                    meth_lookup m_id env
-                  with
-                    | Not_found ->
-                        raise (TypeError (a.a_loc, "L'identifiant "^m_id^
-                        " ne fait référence à aucune méthode connue."))
-                  end
-            end in
-            (* On calcule les types donnés en argument et on stocke leur 
-             * localisation au passage. *)
-            let taus = List.map (typerType_of_typ env) (get_list argst.at_cont)
-            (* On vérifie que types calculés dans loctyps sont bien formés. *)
-            in let f eloc_o t =
-              begin match eloc_o with
-                | None -> is_bf m.tm_env argst.at_loc t
-                | Some _ as o -> o
-              end in
-            let all_bf = List.fold_left f None taus in
-            begin match all_bf with
-              | Some errloc ->
-                  raise (TypeError (errloc, "Ce type n'est pas bien formé."))
-              | None -> ()
-            end;
-            (* On calcule la substitution associée à la méthode et on vérifie
-             * que sa composée avec la substitution associée à la classe est
-             * bien formée. *)
-            let s' = subst_from_lists m.tm_type_params taus in
-            let all_tpts = m.tm_type_params @
-              (List.map tpt_of_tptc c.cc_tptcs) in
-            let ss' = subst_compose s s' in
-            begin match is_subst_bf env all_tpts ss' with
-              | Some eloc ->
-                  raise (TypeError (eloc, "Cette substitution n'est pas bien "^
-                  "formée, le problème se situe au niveau du type localisé."))
-              | None      -> ()
-            end;
-            (* On type toutes les expressions passées en paramètre de
-             * la méthode. *)
-            let es' = List.map (type_expr env tro) es in
-            (* On extrait la liste des types des arguments de la méthode dans
-             * sa définition. *)
-            let tau's = List.map (fun p -> p.tp_typ) m.tm_params in
-            (* On vérifie que les types calculés sont bien inférieurs aux types
-             * annoncés par le programme. *)
-            begin try 
-              let f t1 t2 eloc = 
-                if not (is_sstype env e.e_loc t1 t2) then
-                  raise (TypeError (eloc, "Ces types sont incompatibles.")) in
-              iter3 f
-                (List.map (fun exp -> exp.te_typ) es')
-                (List.map (subst ss') tau's) 
-                (List.map (fun exp -> exp.te_loc) es')
+  | Eacc_typ_exp (e', m_id, argst, es) ->
+      (* On commence par typer l'expression qui appelle la
+       * méthode et on vérifie que c'est une instance de classe. *) 
+      let e'' = type_expr env tro e' in
+      let (cid,s) = begin match e''.te_typ with
+        | Tclasse(cid, s) -> (cid,s)
+        | _ ->
+            raise (TypeError (e'.e_loc, "Cette expression n'est pas une "^
+            "instance d'une classe, elle ne peut pas avoir de méthode."))
+      end in
+      let c = classe_lookup env cid in
+      (* On va chercher la méthode dans l'environnement de la classe. *)
+      let m = begin try meth_lookup m_id c.cc_env  with
+        (* Si la méthode a été typée récemment, elle n'est pas encore
+          * dans c.cc_env mais elle est dans env *)
+        | Not_found ->
+            begin try
+              meth_lookup m_id env
             with
-              | Invalid_argument _ ->
-                  raise (TypeError (e.e_loc, "Cette méthode n'a pas reçu le "^
-                  "bon nombre d'arguments."))
-            end;
-            (* On type enfin l'application de la méthode. *)
-            let new_a = {
-                ta_cont = TAexpr_ident(e'', m_id);
-                ta_loc  = a.a_loc
-            } in {
-              te_cont = TEacc_typ_exp (new_a, targst_of_argst env argst, es');
-              te_typ = subst ss' m.tm_res_type; 
-              te_loc = e.e_loc
-            }
-      end
+              | Not_found ->
+                  raise (TypeError (e'.e_loc, "L'identifiant "^m_id^
+                  " ne fait référence à aucune méthode connue."))
+            end
+      end in
+      (* On calcule les types donnés en argument et on stocke leur 
+        * localisation au passage. *)
+      let taus = List.map (typerType_of_typ env) (get_list argst.at_cont)
+      (* On vérifie que types calculés dans loctyps sont bien formés. *)
+      in let f eloc_o t =
+        begin match eloc_o with
+          | None -> is_bf m.tm_env argst.at_loc t
+          | Some _ as o -> o
+        end in
+      let all_bf = List.fold_left f None taus in
+      begin match all_bf with
+        | Some errloc ->
+            raise (TypeError (errloc, "Ce type n'est pas bien formé."))
+        | None -> ()
+      end;
+      (* On calcule la substitution associée à la méthode et on vérifie
+        * que sa composée avec la substitution associée à la classe est
+        * bien formée. *)
+      let s' = subst_from_lists m.tm_type_params taus in
+      let all_tpts = m.tm_type_params @
+        (List.map tpt_of_tptc c.cc_tptcs) in
+      let ss' = subst_compose s s' in
+      begin match is_subst_bf env all_tpts ss' with
+        | Some eloc ->
+            raise (TypeError (eloc, "Cette substitution n'est pas bien "^
+            "formée, le problème se situe au niveau du type localisé."))
+        | None      -> ()
+      end;
+      (* On type toutes les expressions passées en paramètre de
+        * la méthode. *)
+      let es' = List.map (type_expr env tro) es in
+      (* On extrait la liste des types des arguments de la méthode dans
+        * sa définition. *)
+      let tau's = List.map (fun p -> p.tp_typ) m.tm_params in
+      (* On vérifie que les types calculés sont bien inférieurs aux types
+        * annoncés par le programme. *)
+      begin try 
+        let f t1 t2 eloc = 
+          if not (is_sstype env e.e_loc t1 t2) then
+            raise (TypeError (eloc, "Ces types sont incompatibles.")) in
+        iter3 f
+          (List.map (fun exp -> exp.te_typ) es')
+          (List.map (subst ss') tau's) 
+          (List.map (fun exp -> exp.te_loc) es')
+      with
+        | Invalid_argument _ ->
+            raise (TypeError (e.e_loc, "Cette méthode n'a pas reçu le "^
+            "bon nombre d'arguments."))
+      end;
+      (* On type enfin l'application de la méthode. *)
+      {
+        te_cont = TEacc_typ_exp (e'', m_id, targst_of_argst env argst, es');
+        te_typ = subst ss' m.tm_res_type; 
+        te_loc = e.e_loc
+      }
   | Ereturn None ->
       (* On va voir le type de retour. *)
       let tr = begin match tro with
@@ -1072,16 +1043,15 @@ let type_decl (env, tdl) d = match d.decl_cont with
         "ne sont pas distincts deux à deux."));
       (* On vérifie que les identificateurs des paramètres du constructeur sont
        * tous différents. *)
-      if not (list_uniq (fun p -> p.p_name) (get_meth_params m)) then
+      if not (list_uniq (fun p -> p.p_name) m.m_params) then
         raise (TypeError (m.m_loc, "Les paramètres de cette méthode ne sont"^
         " ne sont pas distincts deux à deux."));
       (* Unicité : On vérifie que le nom de la méthode qu'on veut ajouter n'est
        * pas déjà pris par une variable, on s'occupe de la surcharge de méthodes
        * plus loin. *)
-      let m_id = get_meth_id m in
-      if  List.exists (fun cv -> get_cv_id cv = m_id) env.vars then
-        raise (TypeError (m.m_loc, "Le nom de méthode "^m_id^" est déjà "^
-        "pris."));
+      if List.exists (fun cv -> get_cv_id cv = m.m_name) env.vars then
+        raise (TypeError (m.m_loc, "Le nom de méthode "^m.m_name^
+        " est déjà pris."));
       (* On définit enfin un nouvel environnement pour la méthode qu'on va
        * remplir au fur et à mesure. *)
       let gamma'' = ref env in
@@ -1091,88 +1061,53 @@ let type_decl (env, tdl) d = match d.decl_cont with
        * vérifient les conditions de variance puis on ajoute les arguments
        * à l'environnement. *)
       gamma'' := 
-        List.fold_left (check_param true) !gamma'' (get_meth_params m);
-      (* On calcule le type de retour de la méthode *)
-      let tau = begin match m.m_cont with
-        | Mblock _ ->  Tunit
-        | Mexpr me  ->  
-            let tau = typerType_of_typ !gamma'' me.res_type
-            in begin match is_bf !gamma'' m.m_loc tau with
-                | Some eloc ->
-                    raise (TypeError (eloc, "Ce type n'est pas bien formé à "^
-                    "l'endroit indiqué."))
-                | None -> tau
-            end
-      end in
+        List.fold_left (check_param true) !gamma'' m.m_params;
+      (* On calcule le type de retour de la méthode et  on vérifie qu'il est
+       * bien formé. *)
+      let tau = typerType_of_typ !gamma'' m.m_res_type in
+      begin match is_bf !gamma'' m.m_loc tau with
+          | Some eloc ->
+              raise (TypeError (eloc, "Ce type n'est pas bien formé à "^
+              "l'endroit indiqué."))
+          | None -> ()
+      end;
       (* On effectue le test de variance sur le type de retour. *)
       variance_type !gamma'' None Pos tau;
-      (* On ajoute la méthode à gamma'' *)
-      let tm = begin match m.m_cont with 
-        | Mblock mb -> {
-              tm_name = mb.mb_name;
-              tm_override = mb.mb_override;
-              tm_type_params = List.map (tpt_of_pt !gamma'')
-                (get_list mb.mb_type_params);
-              tm_params = List.map (tparam_of_param !gamma'') mb.mb_params;
-              tm_res_type = tau;
-              tm_res_expr = {te_cont = TEvoid; te_typ = tau; te_loc = m.m_loc};
-              tm_loc = m.m_loc;
-              tm_env = !gamma''
-            }
-        | Mexpr me  -> {
-              tm_name = me.me_name;
-              tm_override = me.me_override;
-              tm_type_params = List.map (tpt_of_pt !gamma'')
-                (get_list me.me_type_params);
-              tm_params = List.map (tparam_of_param !gamma'') me.me_params;
-              tm_res_type = tau;
-              tm_res_expr = {te_cont = TEvoid; te_typ = tau; te_loc = m.m_loc};
-              tm_loc = m.m_loc;
-              tm_env = !gamma'' 
-            }
-      end in
       (* On ajoute cette version simplifié de la méthode à l'environnement local
        * de la méthode. Il n'a pas besoin d'en savoir plus. *)
+      let tm = {
+        tm_name = m.m_name;
+        tm_override = m.m_override;
+        tm_type_params =
+          List.map (tpt_of_pt !gamma'') (get_list m.m_type_params);
+        tm_params = List.map (tparam_of_param !gamma'') m.m_params;
+        tm_res_type = tau;
+        (* C'est louche ce truc. *)
+        tm_res_expr = {te_cont = TEvoid; te_typ = tau; te_loc = m.m_loc};
+        tm_loc = m.m_loc;
+        tm_env = !gamma'' 
+      } in
       gamma'' := add_tmeth_env !gamma'' tm;
-      (* On type l'expression qui définit la méthode *)
-      let tm' = begin match m.m_cont with 
-        | Mblock mb -> 
-            let te = type_expr !gamma'' (Some tau) {
-              e_cont = Ebloc mb.bloc;
-              e_loc = mb.bloc.bl_loc
-            } in
-            if not (is_sstype !gamma'' te.te_loc te.te_typ tau) then
-              raise (TypeError (te.te_loc, "Le type de cette expression n'est"^
-              " pas compatible avec le type de retour indiqué pour la méthode."));
-            {
-              tm_name = mb.mb_name;
-              tm_override = mb.mb_override;
-              tm_type_params = List.map (tpt_of_pt !gamma'')
-                (get_list mb.mb_type_params);
-              tm_params = List.map (tparam_of_param !gamma'') mb.mb_params;
-              tm_res_type = tau;
-              tm_res_expr = te;
-              tm_loc = m.m_loc;
-              tm_env = !gamma''
-            }
-        | Mexpr me  ->
-            let te = type_expr !gamma'' (Some tau) me.res_expr in
-            if not (is_sstype !gamma'' te.te_loc te.te_typ tau) then
-              raise (TypeError (te.te_loc, "Le type de cette expression "^
-              "("^(string_of_typ !gamma'' te.te_typ)^") n'est pas compatible "^
-              "avec le type de retour "^(string_of_typ !gamma'' tau)^"."));
-            {
-              tm_name = me.me_name;
-              tm_override = me.me_override;
-              tm_type_params = List.map (tpt_of_pt !gamma'')
-                (get_list me.me_type_params);
-              tm_params = List.map (tparam_of_param !gamma'') me.me_params;
-              tm_res_type = tau;
-              tm_res_expr = te;
-              tm_loc = m.m_loc;
-              tm_env = !gamma''
-            }
-      end in
+      (* On type l'expression qui définit la méthode et on vérifie le
+       * sous-typage avec le type de retour. *)
+      let te = type_expr !gamma'' (Some tau) m.m_res_expr in
+      if not (is_sstype !gamma'' te.te_loc te.te_typ tau) then
+        raise (TypeError (te.te_loc, "Le type de cette expression "^
+        "("^(string_of_typ !gamma'' te.te_typ)^") n'est pas compatible "^
+        "avec le type de retour "^(string_of_typ !gamma'' tau)^"."));
+      (* On écrit la vraie méthode typée cette fois. *)
+      let tm' = {
+        tm_name = m.m_name;
+        tm_override = m.m_override;
+        tm_type_params =
+          List.map (tpt_of_pt !gamma'') (get_list m.m_type_params);
+        tm_params = List.map (tparam_of_param !gamma'') m.m_params;
+        tm_res_type = tau;
+        tm_res_expr = te;
+        tm_loc = m.m_loc;
+        tm_env = !gamma'' (* TODO : changer la méthode son propre environnement
+        local ? *)
+      } in
       (* On n'effectue qu'ici les tests liée au mot clef override *)
       if tm'.tm_override then
         let m' = begin try 
@@ -1497,21 +1432,11 @@ let type_classe_Main env cm =
         "\"main\"."))
     | d::q -> begin match d.decl_cont with
           | Dvar _  -> find_main q 
-          | Dmeth m -> begin match m.m_cont with
-              | Mblock mb ->
-                  if mb.mb_name = "main" then
-                    (mb.mb_params, {
-                      t_name = "Unit";
-                      args_type = {at_cont = None; at_loc = mb.bloc.bl_loc};
-                      t_loc = mb.bloc.bl_loc})
-                  else
-                    find_main q
-              | Mexpr me ->
-                  if me.me_name = "main" then
-                    (me.me_params, me.res_type)
-                  else
-                    find_main q
-          end
+          | Dmeth m ->
+              if m.m_name = "main" then
+                (m.m_params, m.m_res_type)
+              else
+                find_main q
     end in
   (* On vérifie que la méthode main trouvée est de la forme adéquate. *)
   let (ps, t) = find_main cm.cM_cont in
