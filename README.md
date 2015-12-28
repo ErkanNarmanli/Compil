@@ -30,3 +30,11 @@ un AST lors de l'analyse syntaxique et un AST typé (TAST) lors du typage.
 * On s'est apperçu trop tard que l'on avait pas besoin de toute l'information
   sur les objets que l'on gardait dans le contexte. On y conserve beaucoup trop
   d'information. Ça a été réglé après mais nous a pas mal ralenti.
+
+### Bugs
+
+* Bug signalé par tobast : cf le test tests/bonus/tobast.scala. Il ne devrait
+  pas passer le typage (?) mais le passe quand même. On attend une confirmation
+  pour ajouter un test qui rejette ce genre de programme.
+* Bug signalé par tobast : il semblerait qu'il faille ajouter address à x86.mli
+  (pas encore à ce point dans le projet)
