@@ -1,7 +1,7 @@
 CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo misc.cmo context.cmo substitution.cmo printing.cmo variance.cmo typer.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=main
-FLAGS=-w @A-4
+FLAGS=-w +A-4
 
 
 make: $(CMO)

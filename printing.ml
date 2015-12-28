@@ -23,11 +23,14 @@ let rec string_of_typ env = function
 
 (* Affichage d'une classe *)
 and string_of_class env i sub =
-  i^"["^(
-  List.fold_left (fun s t -> s^(string_of_typ env t)^", ") ""
-    (List.map (subst_id sub) (get_tptc_id_list (try classe_lookup env i with
-    | Not_found -> failwith ("c'est qui "^i^" ?")).cc_tptcs))
-  )^"]"
+  let args = try
+    let ids = get_tptc_id_list (classe_lookup env i).cc_tptcs in
+    let args = List.map (subst_id sub) ids in
+    List.fold_left (fun s t -> s^(string_of_typ env t)^", ") "" args
+  with
+    | Not_found -> "?"
+  in
+  i^"["^args^"]"
 
 (* context -> substitution -> unit *) 
 let print_subst env s = 

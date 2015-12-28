@@ -79,7 +79,11 @@ let herits_from env loc0 cid1 cid2 =
     end in herits_from_c2 cid1
     
 (* Sous-typage *)
-let rec is_sstype env loc0 t1 t2 = match (t1, t2) with
+let rec is_sstype env loc0 t1 t2 =
+  let ts1 = string_of_typ env t1 in
+  let ts2 = string_of_typ env t2 in
+  print_endline ("Début : "^ts1^" <= "^ts2^".");
+  match (t1, t2) with
   | Tnothing, _             -> true
   | Tnull,  Tclasse (_, _)  -> true
   | Tnull, Tstring          -> true 
@@ -851,7 +855,6 @@ let pt_add env pt =
         | None          -> None 
         | Some (Hinf t) ->
             let t' = typerType_of_typ env t in
-            print_endline ("ici : "^t.t_name^".");
             variance_type env None Pos t';
             None 
         | Some (Hsup t) ->
@@ -1276,7 +1279,39 @@ let tparam_of_param env p =
     tp_typ  = typerType_of_typ env p.p_typ;
     tp_loc = p.p_loc
   }  
-  
+
+(* Adapte les méthodes héritées pour les ajouter à l'environnement d'une classe.
+ * sig *)
+let update_meth env tptcs typs m = 
+  let rec find id = function
+    | ([], []) -> None
+    | (tptc::q1, t::q2) ->
+        if get_tptc_id tptc = id then
+          Some t
+        else
+          find id (q1, q2)
+    | _ -> 
+        failwith "On n'arrive pas là." in
+  let f c = begin match find c.cc_name (tptcs, typs) with
+    | None -> Some c
+    | Some t ->
+        begin match t with
+          | Tclasse (cid, _) ->
+              Some (classe_lookup env cid)
+          | _ -> None
+        end
+  end in
+  let cs = filter_map f m.tm_env.classes in
+  {
+    tm_name         = m.tm_name;
+    tm_override     = m.tm_override;
+    tm_type_params  = m.tm_type_params;
+    tm_params       = m.tm_params;
+    tm_res_type     = m.tm_res_type;
+    tm_res_expr     = m.tm_res_expr;
+    tm_loc          = m.tm_loc;
+    tm_env          = set_classes cs m.tm_env;
+  }
 
 (* typage des classes
  * context -> classe -> (context * tclasse) *) 
@@ -1321,7 +1356,7 @@ let type_classe env c =
               (* On effectue les tests de variance *)
               variance_type !gamma' (Some tptcs) Pos tau;
               begin match tau with
-                | Tclasse (cid, _) ->
+                | Tclasse (cid, s) ->
                     (* On va chercher dans l'environnement la classe dont on
                      * hérite. *)
                     let c' = begin try
@@ -1333,7 +1368,13 @@ let type_classe env c =
                     end in
                     (* On ajoute les méthodes et variables héritées à gamma'.
                      * Attention, l'ajout des méthodes est délicat. *)
-                    let add_meths = c'.cc_env.meths in
+                    let tptcs' = c'.cc_tptcs in
+                    let typs = List.map
+                      (fun tptc -> subst_id s (get_tptc_id tptc))
+                      tptcs' in
+                    let add_meths =
+                      List.map (update_meth !gamma' tptcs' typs)
+                      c'.cc_env.meths in
                     gamma' := {
                       classes = !gamma'.classes;
                       constrs = !gamma'.constrs;

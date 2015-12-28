@@ -2,7 +2,6 @@ open Tast
 open Context
 open Substitution
 open Misc
-open Printing
 
 exception TypeError of loc * string
 
@@ -108,8 +107,6 @@ let rec variance_classe env tptcs pos cid s =
  * context -> (tparam_type_classe list) option -> position -> typerType ->
    * unit. *)
 and variance_type env lo pos t =
-  let s = string_of_typ env t in
-  Printf.printf "Test de variance pour %s.\n" s;
   let v, tptcs = get_variance' env lo t in
   match v with
     | None ->
