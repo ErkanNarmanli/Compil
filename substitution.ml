@@ -3,19 +3,7 @@ open Misc
 open Context
 
 (* La substitution triviale *)
-let subst0 () =
-  let init = [
-    "Any",      Tany;
-    "AnyVal",   TanyVal;
-    "Boolean",  Tboolean;
-    "Int",      Tint;
-    "Unit",     Tunit;
-    "AnyRef",   TanyRef;
-    "String",   Tstring;
-    "Null",     Tnull;
-    "Nothing",  Tnothing;
-    ] in
-  List.fold_left (fun m (id, t) -> Smap.add id t m) Smap.empty init  
+let subst0 () = Smap.empty
 
 (* tparam_type list -> typerType list -> substitution *)
 let subst_from_lists tpts ts = 

@@ -57,6 +57,44 @@ let add_tmeth_env env tm =
     meths   = tm::env.meths
   }
 
+(* Redéfinit l'environnement local d'une méthode.
+ * context -> tmethode -> tmethode *)
+let set_meth_env env m = {
+  tm_name         = m.tm_name;
+  tm_override     = m.tm_override;
+  tm_type_params  = m.tm_type_params;
+  tm_params       = m.tm_params;
+  tm_res_type     = m.tm_res_type;
+  tm_res_expr     = m.tm_res_expr;
+  tm_loc          = m.tm_loc;
+  tm_env          = env
+}
+
+(* Redéfinit l'environnement local d'une classe.
+ * context -> context_classe -> context_classe. *)
+let set_classe_env env c = {
+  cc_name   = c.cc_name;
+  cc_tptcs  = c.cc_tptcs;
+  cc_params = c.cc_params;
+  cc_deriv  = c.cc_deriv;
+  cc_env    = env;
+}
+
+(* Change la définition d'une classe dans l'environnement.
+ * context_classe -> context -> context *)
+let update_classe_env c env =
+  let update c' = 
+    if c.cc_name = c'.cc_name then
+      c
+    else
+      c' in
+  {
+    classes = List.map update env.classes;
+    constrs = env.constrs;
+    vars    = env.vars;
+    meths   = env.meths;
+  }
+
 (* chercher une classe dans l'environnement env *)
 let classe_lookup env id = 
   let rec aux = function

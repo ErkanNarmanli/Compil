@@ -15,6 +15,13 @@ let rec iter3 f l1 l2 l3 = match (l1, l2, l3) with
       iter3 f q1 q2 q3
   | _ -> raise (Invalid_argument "Tailles incompatibles dans iter3") 
 
+(* ('a -> 'b -> 'c -> ->'d) -> 'a -> 'b list -> 'c list -> 'd list -> 'a *)
+let rec fold_left3 f x l1 l2 l3 = match (l1, l2, l3) with
+  | ([], [], []) -> x
+  | (t1::q1, t2::q2, t3::q3) ->
+      fold_left3 f (f x t1 t2 t3) q1 q2 q3
+  | _ -> raise (Invalid_argument "Tailles incompatibles dans fold_left3.")
+
 (* Même résultat qu'un List.filter puis List.map en un seul parcours de la liste
  * ('a -> 'b option) -> 'a list -> 'b list *)
 let rec filter_map f = function
