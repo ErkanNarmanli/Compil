@@ -1,10 +1,11 @@
 CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo misc.cmo context.cmo substitution.cmo printing.cmo variance.cmo typer.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=main
+FLAGS=-w @A-4
 
 
 make: $(CMO)
-	ocamlc -o $(BIN) $(CMO)
+	ocamlc $(FLAGS) -o $(BIN) $(CMO)
 
 .SUFFIXES: .mli .ml .cmi .cmo .mll .mly
 
@@ -12,7 +13,7 @@ make: $(CMO)
 	ocamlc -c $<
 
 %.cmo: %.ml
-	ocamlc -c $<
+	ocamlc $(FLAGS) -c $<
 
 %.ml: %.mll
 	ocamllex $<

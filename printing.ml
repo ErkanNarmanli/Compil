@@ -25,7 +25,7 @@ let rec string_of_typ env = function
 and string_of_class env i sub =
   i^"["^(
   List.fold_left (fun s t -> s^(string_of_typ env t)^", ") ""
-    (List.map (subst_id env sub) (get_tptc_id_list (try classe_lookup env i with
+    (List.map (subst_id sub) (get_tptc_id_list (try classe_lookup env i with
     | Not_found -> failwith ("c'est qui "^i^" ?")).cc_tptcs))
   )^"]"
 

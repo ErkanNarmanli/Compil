@@ -48,10 +48,10 @@ let get_list = function
  * param_type_classe -> loc *)
 let make_ptcs_loc ptcs = 
     let rec aux = function
-        | []      -> failwith "make_ptcs_loc n'est pas censé prendre une
-                     liste vide, si ?"
+        | []      ->
+                failwith "make_ptcs_loc n'est pas censé prendre une liste vide."
         | [ptc]   -> snd ptc.ptc_loc
-        | a::q    -> aux q
+        | _::q    -> aux q
     in (fst( (List.hd ptcs).ptc_loc), aux ptcs)
 
 (* Remplace le premier élément de la liste vérifiant le prédicat p par x. *)
@@ -67,13 +67,7 @@ let rec replace_in_list p x = function
 (* acces -> ident *)
 let get_acces_id a = match a.a_cont with
     | Aident i ->           i
-    | Aexpr_ident (e, i) -> i       
-
-(* param_type_classe -> ident *)
-let get_ptc_id p = match p.ptc_cont with
-  | PTCplus  pt -> fst pt.pt_cont
-  | PTCmoins pt -> fst pt.pt_cont
-  | PTCrien  pt -> fst pt.pt_cont
+    | Aexpr_ident (_, i) -> i       
 
 (* param_type_classe -> param_type_heritage option *)
 let get_ptc_borne ptc = match ptc.ptc_cont with
@@ -151,7 +145,7 @@ let get_tptc_id tptc = match tptc.tptc_cont with
   | TPTCrien  tpt -> fst tpt.tpt_cont
 
 (* tparam_type_classe list -> ident list *)
-let rec get_tptc_id_list = List.map get_tptc_id
+let get_tptc_id_list = List.map get_tptc_id
 
 (* tclasse -> tparam_type_heritage option list *)
 let get_bornes_list_c c =
@@ -171,7 +165,7 @@ let get_bornes_list_c c =
 (* acces -> tacces *)
 let tacces_of_acces a = match a.a_cont with
     | Aident i ->           { ta_cont = TAident i; ta_loc = a.a_loc}
-    | Aexpr_ident (e,i) ->  failwith "On arrive jamais ici"
+    | Aexpr_ident (_,_) ->  failwith "On arrive jamais ici"
 
 (* binop -> tbinop *)
 let tbinop_of_binop b =

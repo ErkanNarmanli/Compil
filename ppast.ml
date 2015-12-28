@@ -1,5 +1,4 @@
 open Ast
-open Printf
 
 let print_ident = print_string
 

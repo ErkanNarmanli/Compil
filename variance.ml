@@ -58,8 +58,8 @@ let rec get_variance' env lo t = match lo with
         end
       with
         | Not_found ->
-            failwith "On ne sait pas dans quelle classe aller chercher les
-            paramètres de type."
+            failwith ("On ne sait pas dans quelle classe aller chercher les "^
+            "paramètres de type.")
       end
 
 (* Version abrégée. *)
@@ -72,19 +72,19 @@ let get_variance env tptcs t = fst (get_variance' env (Some tptcs) t)
 let variance_tptc var eloc = function
   | Pos ->
       if not var then
-        raise (TypeError (eloc, "Ce type est contravariant et apparaît dans
-        une position positive."))
+        raise (TypeError (eloc, "Ce type est contravariant et apparaît dans "^
+        "une position positive."))
   | Neg ->
       if var then
-        raise (TypeError (eloc, "Ce type est covariant et apparaît dans un
-        position négative."))
+        raise (TypeError (eloc, "Ce type est covariant et apparaît dans une "^
+        "position négative."))
   | Neutre ->
       if var then
-        raise (TypeError(eloc, "Cette variable de type est
-        covariante et apparaît dans un position neutre."))
+        raise (TypeError(eloc, "Cette variable de type est covariante et "^
+        "covariante et apparaît dans un position neutre."))
       else
-        raise (TypeError(eloc, "Cette variable de type est
-        contravariante et apparaît dans un position neutre."))
+        raise (TypeError(eloc, "Cette variable de type est contravariante et "^
+        "apparaît dans un position neutre."))
 
 (* Vérifie qu'une classe en position positive ou négative vérifie les règles de
  * variance. Soulève une erreur si ce n'est pas le cas, ne rend rien sinon.
@@ -92,13 +92,13 @@ let variance_tptc var eloc = function
    * substitution -> unit *)
 let rec variance_classe env tptcs pos cid s = 
   let f tptc =
-    let t = subst_id env s (get_tptc_id tptc) in
+    let t = subst_id s (get_tptc_id tptc) in
     begin match tptc.tptc_cont with
-      | TPTCplus tpt  ->
+      | TPTCplus _  ->
           variance_type env (Some tptcs) pos t
-      | TPTCmoins tpt ->
+      | TPTCmoins _ ->
           variance_type env (Some tptcs) (anti pos) t
-      | TPTCrien tpt  ->
+      | TPTCrien _  ->
           variance_type env (Some tptcs) Neutre t
     end
   in let c = classe_lookup env cid in

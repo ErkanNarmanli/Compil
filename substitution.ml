@@ -22,8 +22,9 @@ let subst_from_lists tpts ts =
   let rec aux m = function 
     | [], []          ->  m
     | t1::q1, t2::q2  ->  Smap.add (get_tpt_id t1) t2 (aux m (q1, q2)) 
-    | _               ->  failwith "Les listes tptcs et ts n'ont pas la même
-    longueur dans subst_from_lists, ce n'est pas normal"
+    | _               ->
+            failwith ("Les listes tptcs et ts n'ont pas la même longueur "^
+            "dans subst_from_lists, ce n'est pas normal.")
   in aux Smap.empty (tpts, ts)
 
 
@@ -63,21 +64,22 @@ let rec add_one_key id t m =
   Smap.add id t m'
 
 (* Composition des substitutions *)
-let rec subst_compose s s' = Smap.fold add_one_key s s'
+let subst_compose s s' = Smap.fold add_one_key s s'
 
 (* fonction de substitution
- * subst : context -> substitution -> typerType -> typerType *)
-let rec subst env s = function
+ * subst : substitution -> typerType -> typerType *)
+let subst s = function
   | Tclasse (cid, s') ->
       begin try 
           Smap.find cid s
       with  
-        | Not_found -> Tclasse (cid, subst_compose s s')
+        | Not_found ->
+            Tclasse (cid, subst_compose s s')
       end
   | t -> t 
 
 (* Idem mais mais applicable à un id.
  * /!\ Doit servir uniquement à substituer un paramètre de type
  * subst_id -> context -> substitution -> ident -> typerType *)
-let subst_id env s id = subst env s (Tclasse (id, subst0 ()))
+let subst_id s id = subst s (Tclasse (id, subst0 ()))
 
