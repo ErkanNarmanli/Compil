@@ -37,6 +37,6 @@ test: make
 	./test -2 ./$(BIN)
 
 stats: make
-	./stats -v
+	./stats -w
 
 

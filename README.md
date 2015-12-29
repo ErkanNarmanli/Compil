@@ -17,10 +17,11 @@ un AST lors de l'analyse syntaxique et un AST typé (TAST) lors du typage.
 -------------
 ### Pour le moment on a
 * Un lexer/parser qui passe tous les tests.
-* Un typer qui passe 95% des tests.
+* Un typer qui passe 98% des tests.
 
 ### Reste à faire
 
+* Changer les `subst\_compose s (subst0 ())` en `s`
 * Le typeur comporte encore quelques bugs à régler.
 * La génération de code.
 

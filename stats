@@ -3,26 +3,26 @@
 files=("misc.ml" "substitution.ml" "context.ml" "variance.ml" "printing.ml" "typer.ml")
 
 OPTIND=1
-verbose=0
 warnings=()
 nowarn=1
+verb=0
 
 # Prints help message
 show_help () {
     echo "usage: ./stat.sh [-vf]"
     echo "  -h : show this help message"
-    echo "  -v : verbose"
+    echo "  -w : show_warnings"
 }
 
 # Options parsing
-while getopts "hv" opt; do
+while getopts "hw" opt; do
     case $opt in
         h)
             show_help
             exit 0
             ;;
-        v)
-            verbose=1
+        w)
+            verb=1
             ;;
     esac
 done
@@ -39,13 +39,22 @@ aligned_print () {
     printf "    $1%${n}s $2 occurence$plural\n" ":"
 }
 
+# Prints the list of useless functions
+show_warns () {
+    echo
+    if [ $nowarn -eq 1 ]; then
+        echo "Toutes les fonctions sont utilisées au moins une fois."
+    else
+        echo "Les fonctions ci-dessous ne sont jamais utilisées dans le programme :"
+        for val in $warnings; do
+            echo " - $val"
+        done
+    fi
+}
+
 # Counts the number of appearance of each function 
 for f in $files; do
-    if [ $verbose -eq 1 ]; then
-        echo "Fonctions du fichier $f :"
-    else
-        echo -n "."
-    fi
+    echo "Fonctions du fichier $f :"
     liste=$(ocamlc -i $f | grep -o "^val [a-Z0-1_]\+" | sed "s/^val //")
     echo $liste | while read val; do
         nb=$(cat *.ml | grep $val | wc -l)
@@ -53,23 +62,12 @@ for f in $files; do
             warnings+=$val
             nowarn=0
         fi
-        if [ $verbose -eq 1 ]; then
-            aligned_print $val $nb
-        fi
+        aligned_print $val $nb
     done
-    if [ $verbose -eq 1 ]; then
-        echo
-    fi
+    echo
 done
 
-echo
-# Prints the list of useless functions
-if [ $nowarn -eq 1 ]; then
-    echo "Toutes les fonctions sont utilisées au moins une fois."
-else
-    echo "Les fonctions ci-dessous ne sont jamais utilisées dans le programme :"
-    for val in $warnings; do
-        echo " - $val"
-    done
+if [ $verb -eq 1 ]; then
+    show_warns
 fi
 
