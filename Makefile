@@ -3,7 +3,6 @@ GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=main
 FLAGS=-w +A-4
 
-
 make: $(CMO)
 	ocamlc $(FLAGS) -o $(BIN) $(CMO)
 
@@ -36,5 +35,8 @@ include .depend
 
 test: make
 	./test -2 ./$(BIN)
+
+stats: make
+	./stats -v
 
 

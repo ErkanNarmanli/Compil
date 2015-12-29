@@ -4,15 +4,18 @@ files=("misc.ml" "substitution.ml" "context.ml" "variance.ml" "printing.ml" "typ
 
 OPTIND=1
 verbose=0
+warnings=()
+nowarn=1
 
+# Prints help message
 show_help () {
     echo "usage: ./stat.sh [-vf]"
     echo "  -h : show this help message"
     echo "  -v : verbose"
 }
 
-
-while getopts "vh" opt; do
+# Options parsing
+while getopts "hv" opt; do
     case $opt in
         h)
             show_help
@@ -24,8 +27,7 @@ while getopts "vh" opt; do
     esac
 done
 
-warnings=()
-
+# For a pretty print
 aligned_print () {
     n=$(echo $1 | wc -c)
     n=$((30 - n)) 
@@ -37,6 +39,7 @@ aligned_print () {
     printf "    $1%${n}s $2 occurence$plural\n" ":"
 }
 
+# Counts the number of appearance of each function 
 for f in $files; do
     if [ $verbose -eq 1 ]; then
         echo "Fonctions du fichier $f :"
@@ -48,6 +51,7 @@ for f in $files; do
         nb=$(cat *.ml | grep $val | wc -l)
         if [ $nb -eq 1 ]; then
             warnings+=$val
+            nowarn=0
         fi
         if [ $verbose -eq 1 ]; then
             aligned_print $val $nb
@@ -59,8 +63,13 @@ for f in $files; do
 done
 
 echo
-echo "Les fonctions ci-dessous ne sont pas utilisées dans le programme :"
-for val in $warnings; do
-    echo " - $val"
-done
+# Prints the list of useless functions
+if [ $nowarn -eq 1 ]; then
+    echo "Toutes les fonctions sont utilisées au moins une fois."
+else
+    echo "Les fonctions ci-dessous ne sont jamais utilisées dans le programme :"
+    for val in $warnings; do
+        echo " - $val"
+    done
+fi
 
