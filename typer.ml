@@ -541,6 +541,17 @@ let rec type_expr env tro e = match e.e_cont with
         te_loc = e.e_loc
       }
   | Enew (cid, argst , es) ->
+      (* Test supplémentaire : on vérifie qu'on est pas en train d'appeler le
+       * constructeur d'un paramètre de type... *)
+      begin match fst (var_lookup "this" env) with
+        | Tclasse (cid', _) ->
+            let c' = classe_lookup env cid' in
+            if List.exists (fun tptc -> get_tptc_id tptc = cid) c'.cc_tptcs
+            then
+              raise (TypeError (e.e_loc, "On ne peut pas appeler de "^
+              "constructeur de sur le paramètre de type "^cid^".\n"))
+        | _ -> ()
+      end;
       (* On récupère d'abord la classe concernée dans l'environnement. *)
       let c = try classe_lookup env cid with
         | Not_found ->
