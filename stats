@@ -57,7 +57,7 @@ for f in $files; do
     echo "Fonctions du fichier $f :"
     liste=$(ocamlc -i $f | grep -o "^val [a-Z0-1_]\+" | sed "s/^val //")
     echo $liste | while read val; do
-        nb=$(cat *.ml | grep $val | wc -l)
+        nb=$(cat *.ml | grep -o "[^a-Z0-9_]${val}[ ()]" | wc -l)
         if [ $nb -eq 1 ]; then
             warnings+=$val
             nowarn=0
