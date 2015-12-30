@@ -9,7 +9,7 @@ make: $(CMO)
 .SUFFIXES: .mli .ml .cmi .cmo .mll .mly
 
 %.cmi: %.mli
-	ocamlc -c $<
+	ocamlc $(FLAGS) -c $<
 
 %.cmo: %.ml
 	ocamlc $(FLAGS) -c $<
