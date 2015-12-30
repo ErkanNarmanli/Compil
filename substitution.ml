@@ -50,7 +50,10 @@ let rec add_one_key id t m =
           else
             Tclasse (cid, s)
         else
-          Tclasse (cid, add_one_key id t s)
+          if id = cid then
+            t
+          else 
+            Tclasse (cid, add_one_key id t s)
     | t' -> t'
   in let m' = Smap.mapi f m in
   if Smap.exists (fun i _ -> i = id) m' then
