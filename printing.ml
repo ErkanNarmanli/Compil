@@ -39,3 +39,24 @@ let print_subst env s =
     Printf.printf "%s -> %s; " id (string_of_typ env t)
   in Smap.iter print_cor s;
   print_endline "}"
+
+(* context -> unit *)
+let print_env env = 
+  print_endline "Classes de l'environnement :";
+  List.iter (fun c -> Printf.printf "==%s==\n" c.cc_name) env.classes;
+  print_endline "Constraintes de l'environnement :";
+  List.iter
+    (fun (i, t) ->
+      Printf.printf "%s >: %s\n" i (string_of_typ env t))
+    env.constrs;
+  print_endline "Variables de l'environnement :";
+  List.iter (function
+    | CVal(i, t) ->
+        Printf.printf "val %s : %s\n" i (string_of_typ env t)
+    | CVar(i, t) ->
+        Printf.printf "var %s : %s\n" i (string_of_typ env t))
+    env.vars;
+  print_endline "Les méthodes de l'environnement :";
+  List.iter (fun m -> print_endline m.tm_name) env.meths
+
+  

@@ -34,7 +34,7 @@ let localisation pos =
 let localisation2 (p1, p2) =
   let l1 = p1.pos_lnum in
   let c1 = p1.pos_cnum - p1.pos_bol + 1 in
-  let c2 = p2.pos_cnum - p1.pos_cnum + c1 + 1 in
+  let c2 = p2.pos_cnum - p1.pos_cnum + c1 in
   eprintf "File \"%s\", line %d, characters %d-%d:\n" !ifile l1 c1 c2 
 
 let () =

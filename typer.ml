@@ -92,7 +92,7 @@ let rec eq_types env t1 t2 = match (t1, t2) with
       end
   | Tclasse (_, _), _ -> false
   | _, Tclasse (_, _) -> false
-  | _, _ -> false
+  | _, _ -> t1 = t2
 
 (* Sous-typage
  * context -> loc -> typerType -> typerType -> bool *)
@@ -597,6 +597,7 @@ let rec type_expr env tro e = match e.e_cont with
       end
   | Eacc_typ_exp (e', m_id, argst, es) ->
       Printf.printf "Typage de l'application de %s.\n" m_id;
+      flush stdout;
       (* On commence par typer l'expression qui appelle la
        * méthode et on vérifie que c'est une instance de classe. *) 
       let e'' = type_expr env tro e' in
@@ -607,6 +608,7 @@ let rec type_expr env tro e = match e.e_cont with
             "instance d'une classe, elle ne peut pas avoir de méthode."))
       end in
       Printf.printf "C'est une méthode de la classe %s.\n" cid;
+      flush stdout;
       let c = classe_lookup env cid in
       (* On va chercher la méthode dans l'environnement de la classe. *)
       let m = begin try meth_lookup m_id c.cc_env  with
@@ -624,12 +626,12 @@ let rec type_expr env tro e = match e.e_cont with
       end in
       (* On calcule les types donnés en argument et on stocke leur 
        * localisation au passage. *)
-      Printf.printf "Calcul des arguments de types.\n";
+      Printf.printf "Calcul des arguments de types.\n"; flush stdout;
       let taus = List.map (typerType_of_typ env) (get_list argst.at_cont)
       (* On vérifie que ces types sont bien formés. *)
       in let f eloc_o t =
         begin match eloc_o with
-          | None -> is_bf m.tm_env argst.at_loc t
+          | None -> is_bf env argst.at_loc t
           | Some _ as o -> o
         end in
       begin match List.fold_left f None taus with
@@ -785,14 +787,15 @@ and type_bloc env tro b =
  * formation puis renvoie la variable typée et un environnement enrichi de cette
  * nouvelle variable. *)
 and type_var tro env v =
-  (* Là on distingue en fonction de si l'utilisateur a spécifié un type ou
-   * non. On garde aussi un booléen idiquant si la variable est un val ou
-   * un var. Ça nous évite d'écrire deux fois le même code par la suite.*)
+  (* On extrait les données de la variable et on définit un booléen qui indique
+   * si la variable est mutable ou non. *)
   let (x, t_o, ev, isval) =  begin match v.v_cont with
     | Val (x, t_o, ev) -> (x, t_o, ev, true)
     | Var (x, t_o, ev) -> (x, t_o, ev, false)
   end in
-  (* On type ev. *)
+  Printf.printf "On type la variable %s\n" x;
+  flush stdout; 
+  (* On type l'expression qui définit la variable. *)
   let ev' = type_expr env tro ev in
   begin match t_o with 
     | None   -> 
@@ -1455,12 +1458,17 @@ let type_classe_Main env cm =
     tcM_loc  = tc.tc_loc;
     tcM_env  = tc.tc_env
   } 
-    
+
+(* fichier -> tfichier *)  
 let type_fichier f = 
   let (gamma, classes) = List.fold_left
-      (fun (env, l) c -> let (e, tc) = type_classe env c in (e, tc::l))
+      (fun (env, l) c ->
+          let (e, tc) = type_classe env c in
+          (e, tc::l))
       (env0 (), [])
       f.f_classes in
+  print_endline "Les classes connues avant de typer la classe Main :";
+  List.iter (fun cc -> print_endline cc.cc_name; flush stdout) gamma.classes;
   let tcm = type_classe_Main gamma f.main in
   {
     tclasses = List.rev classes;
