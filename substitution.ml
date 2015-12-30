@@ -1,11 +1,12 @@
 open Tast
 open Misc
-open Context
 
 (* La substitution triviale *)
 let subst0 () = Smap.empty
 
-(* tparam_type list -> typerType list -> substitution *)
+(* Fabrique une subtitution à l'aide d'une liste de paramètres de type de classe
+ * et d'une liste de types.
+ * tparam_type list -> typerType list -> substitution *)
 let subst_from_lists tpts ts = 
   let rec aux m = function 
     | [], []          ->  m
@@ -15,31 +16,8 @@ let subst_from_lists tpts ts =
             "dans subst_from_lists, ce n'est pas normal.")
   in aux Smap.empty (tpts, ts)
 
-
-(* Le type Array[String]
- * loc -> tclasse *)
-let array_tc l =
-  let tptcs = [{
-    tptc_cont = TPTCrien {
-      tpt_cont = ("S", None);
-      tpt_loc = l 
-      };
-    tptc_loc = l
-    }] in {
-  cc_name   = "Array";
-  cc_tptcs  = tptcs;
-  cc_params = [];
-  cc_deriv  = None;
-  cc_env = (add_classe_env (env0 ()) {
-    cc_name   = "S";
-    cc_tptcs  = [];
-    cc_params = [];
-    cc_deriv  = None;
-    cc_env    = env0 ()
-  })
-}
-
-(* Ajout d'une valeur à une substitution en vue d'une composition.
+(* Ajout d'une valeur à une substitution. Utilisée seulement pour la définition
+ * d'une composition.
  * ident -> typerType -> substitution -> substitution *)
 let rec add_one_key id t m = 
   let f id' = function 
@@ -65,7 +43,7 @@ let rec add_one_key id t m =
  * substitution -> substitution -> substitution *)
 let subst_compose = Smap.fold add_one_key
 
-(* fonction de substitution
+(* Applique une substitution à un type.
  * substitution -> typerType -> typerType *)
 let subst s = function
   | Tclasse (cid, s') ->
@@ -93,7 +71,8 @@ let rec subst_acc s a = match a.ta_cont with
       }
 
 (* Substitution de tous les types qui apparaissent dans une expression...
- * Oui c'est violent, mais on n'a pas trouvé de meilleure solution.
+ * Oui c'est violent, mais on n'a pas trouvé de meilleure solution pour
+ * l'héritage.
  * substitution -> texpr -> texpr *)
 and subst_expr s e =
   let cont = match e.te_cont with

@@ -16,14 +16,19 @@
 %token <int>    INT
 %token <string> STRING
 %token <string> IDENT
+%token          TRUE FALSE
 
+(* Opérateurs arithmétiques. *)
 %token ADD SUB MUL DIV MOD INF SUP
-%token EQ NE LT LE GT GE AND OR
 
-%token CLASS DEF ELSE EQREF EXTENDS FALSE IF NEREF NEW NULL OBJECT
-%token OVERRIDE PRINT RETURN THIS TRUE VAL VAR WHILE
-%token MAIN EOF
-%token LPAR RPAR LACC RACC LCRO RCRO CONS EQUAL COMMA NOT DOT SEMICOLON
+(* Opérateurs de comparaison. *)
+%token EQ NE LT LE GT GE AND OR EQREF NEREF
+
+%token CLASS EXTENDS NEW NULL OBJECT MAIN THIS DOT
+%token PRINT RETURN VAL VAR DEF OVERRIDE EQUAL
+%token ELSE IF WHILE
+%token LPAR RPAR LACC RACC LCRO RCRO
+%token EOF COMMA SEMICOLON CONS NOT
 
 (* Priorités et associativité des tokens *)
 %nonassoc IF 
@@ -121,6 +126,8 @@ var:
 methode:
     | o = boption(OVERRIDE); DEF; id = IDENT; pts = param_type_l?;
         LPAR; ps = separated_list(COMMA, parametre); RPAR; b = bloc
+        (* Sucre syntaxique : une méthode sans type de retour explicite a le
+         * type de retour Unit. *)
                 {
                   let l = fst b.bl_loc in
                   let res_type = {

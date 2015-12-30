@@ -2,20 +2,24 @@ open Ast
 
 let print_ident = print_string
 
+(* ('a -> unit) -> string -> 'a list -> unit *)
 let rec print_int_list func sep = function
     | []    -> ()
     | [a]   -> func a
     | a::q  -> func a ; print_string sep ; print_int_list func sep q
 
+(* ('a -> unit) -> string -> string -> string -> 'a list -> unit *)
 let print_list func deb sep fin xs =
     print_string deb ;
     print_int_list func sep xs ;
     print_string fin
 
+(* ('a -> unit) -> 'a option -> unit *)
 let print_o func = function
     | None      -> ()
     | Some x    -> func x
 
+(* ('a -> unit) -> string -> string -> string -> ('a list) option -> unit *)
 let print_list_o func deb sep fin = print_o (print_list func deb sep fin)
 
 let rec print_fichier fich =
@@ -175,3 +179,4 @@ and print_acces a = match a.a_cont with
     | Aexpr_ident (e, i)    -> print_expr e; print_char '.'; print_string i
 
 let print f = print_fichier f; print_endline ""
+

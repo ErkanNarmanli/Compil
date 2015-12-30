@@ -51,7 +51,6 @@
             List.assoc s keywords
         with
         | Not_found -> IDENT s  
-        | e         -> raise e
 
     let check_del d = 
         try
@@ -59,19 +58,12 @@
         with 
         | _ ->  assert false
 
-
-    let implode l =
-          let result = String.create (List.length l) in
-          let rec imp i = function
-          | [] ->       result
-          | c :: l ->   result.[i] <- c; imp (i + 1) l in
-                        imp 0 l
-
     let check_size_int s =
             let i = int_of_string s
-            in  if ((i <= 2147483648 - 1) && (i >= -2147483648))
-                then INT i
-                else raise (Lexing_error "Entier trop grand")
+            in if ((i <= 2147483648 - 1) && (i >= -2147483648)) then
+              INT i
+            else
+              raise (Lexing_error ("Entier trop grand : "^s^"."))
 
 }
 

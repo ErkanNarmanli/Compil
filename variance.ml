@@ -12,16 +12,22 @@ let anti = function
   | Neg -> Pos
   | Neutre -> Neutre
 
-(* Indique si un type est issu d'un paramètre de type covariant /
- * contravariant / sans variance.
- * context -> (tparam_type_classe list) option -> typerType ->
-   * (bool * loc) option
+
+
+
+ 
+(* Indique si un type est issu d'un paramètre de type (le cas échéant)
+ * covariant, contravariant ou sans variance. Renvoie "sans variance" si le type
+ * est un vrai type.
  * covariant (+)     = Some (true, pos)
  * contravariant (-) = Some (false, pos)
  * sans variance     = None
  * lo est éventuellement la liste des paramètres de type dans laquelle chercher
  * la variance. Si lo = None, on devine cette liste à partir du type de 'this'.
- * *)
+ * Dans tous les cas, on rend cette liste, ça permet de ne la calculer qu'une
+ * seule fois.
+ * context -> (tparam_type_classe list) option -> typerType ->
+ *    ((bool * loc) option * tparam_type_classe list) *)
 let rec get_variance' env lo t = match lo with
   | Some tptcs ->
       begin match t with
@@ -49,11 +55,11 @@ let rec get_variance' env lo t = match lo with
       end
   | None ->
       begin try
-        begin match fst (var_lookup "this" env) with
+        begin match fst (var_lookup env "this") with
           | Tclasse(cid, _) ->
               let c = classe_lookup env cid in
               get_variance' env (Some c.cc_tptcs) t
-          | _ -> failwith "var_lookup \"this\" env ne peut renvoyer qu'un classe."
+          | _ -> failwith "this ne peut être qu'une instance de classe."
         end
       with
         | Not_found ->
@@ -61,7 +67,8 @@ let rec get_variance' env lo t = match lo with
             "paramètres de type.")
       end
 
-(* Version abrégée. *)
+(* Version abrégée : on connait déjà les paramètres de type.
+ * context -> tparam_type_classe list -> typerType -> bool option *)
 let get_variance env tptcs t = fst (get_variance' env (Some tptcs) t)
 
 (* Soulève une erreur si la variance et la position ne respectent pas les
@@ -126,6 +133,5 @@ let variance_var env tv = match tv.tv_cont with
       variance_type env None Pos t
   | TVar (_, t, _) ->
       variance_type env None Neutre t
-
 
 

@@ -61,20 +61,9 @@ let make_ptcs_loc ptcs =
         | _::q    -> aux q
     in (fst( (List.hd ptcs).ptc_loc), aux ptcs)
 
-(* Remplace le premier élément de la liste vérifiant le prédicat p par x. *)
-let rec replace_in_list p x = function
-  | []    ->  []
-  | t::q  ->  if p t then x::q else t::(replace_in_list p x q)
-
-
 (*************************
  * Accesseurs pour l'AST *
  *************************)
-
-(* acces -> ident *)
-let get_acces_id a = match a.a_cont with
-    | Aident i ->           i
-    | Aexpr_ident (_, i) -> i       
 
 (* param_type_classe -> param_type_heritage option *)
 let get_ptc_borne ptc = match ptc.ptc_cont with
@@ -90,11 +79,6 @@ let get_ptc_id ptc = match ptc.ptc_cont with
   | PTCplus  pt ->  fst pt.pt_cont
   | PTCmoins pt ->  fst pt.pt_cont
   | PTCrien  pt ->  fst pt.pt_cont
-
-(* classe -> param_type_heritage option list *)
-let get_ptc_borne_list c = match c.type_class_params with
-  | None -> []
-  | Some l -> List.map get_ptc_borne l
 
 (* methode -> param_type list *)
 let get_meth_type_params m = get_list m.m_type_params
@@ -114,22 +98,6 @@ let get_cv_id = function
   | CVar (i, _) -> i
   | CVal (i, _) -> i
 
-(* tvar -> ident *)
-let get_tvar_id tv = match tv.tv_cont with
-    | TVal (id, _, _)   -> id
-    | TVar (id, _, _)   -> id
-
-(* tmethode -> ident list *)
-let get_meth_type_params_id_list m =
-  List.map (fun tpt -> fst tpt.tpt_cont) m.tm_type_params
-
-(* tmethode -> tparam_type_heritage option list *)
-let get_bornes_list_m m =
-  let rec aux = function
-      | []     -> []
-      | tpt::q -> (snd tpt.tpt_cont, tpt.tpt_loc) :: (aux q)
-  in aux m.tm_type_params
-
 (* tparam_type -> ident *)
 let get_tpt_id tpt = fst tpt.tpt_cont
 
@@ -142,25 +110,10 @@ let get_tptc_id tptc = match tptc.tptc_cont with
 (* tparam_type_classe list -> ident list *)
 let get_tptc_id_list = List.map get_tptc_id
 
-(* tclasse -> tparam_type_heritage option list *)
-let get_bornes_list_c c =
-  let rec aux = function
-    | []      -> []
-    | tptc::q -> begin match tptc.tptc_cont with
-                   | TPTCplus tpt  -> (snd tpt.tpt_cont, tpt.tpt_loc) 
-                   | TPTCmoins tpt -> (snd tpt.tpt_cont, tpt.tpt_loc) 
-                   | TPTCrien tpt  -> (snd tpt.tpt_cont, tpt.tpt_loc) 
-                 end :: (aux q) in
-  aux c.ttype_class_params 
 
 (**************
  * Conversion *
  **************)
-
-(* acces -> tacces *)
-let tacces_of_acces a = match a.a_cont with
-    | Aident i ->           { ta_cont = TAident i; ta_loc = a.a_loc}
-    | Aexpr_ident (_,_) ->  failwith "On arrive jamais ici"
 
 (* binop -> tbinop *)
 let tbinop_of_binop b =
@@ -180,5 +133,4 @@ let context_classe_of_tclasse tc = {
   cc_deriv  = tc.tderiv;
   cc_env    = tc.tc_env
 }
-
 

@@ -95,7 +95,8 @@ let update_classe_env c env =
     meths   = env.meths;
   }
 
-(* chercher une classe dans l'environnement env *)
+(* Cherche une classe dans l'environnement env.
+ * context -> ident -> context_classe *)
 let classe_lookup env id = 
   let rec aux = function
     | []      -> raise Not_found
@@ -105,22 +106,19 @@ let classe_lookup env id =
                    aux q
   in aux env.classes
 
-(* Recherche de la déclaration d'une variable dans une var list et renvoie son
- * type ainsi qu'on booléen indiquant si la variable est mutable. *)
-(* ident -> tvar list -> (typerType * bool) *)
-let var_lookup id env = 
+(* Recherche la déclaration d'une variable dans une var list et renvoie son
+ * type ainsi qu'on booléen indiquant si la variable est mutable.
+ * ident -> tvar list -> (typerType * bool) *)
+let var_lookup env id = 
   let rec aux = function
-    | []    ->  raise Not_found 
-    | cv::q ->  begin match cv with
-                  | CVar (i, t) ->  if i = id then
-                                      (t, true)
-                                    else
-                                      aux q
-                  | CVal (i, t) ->  if i = id then
-                                      (t, false)
-                                    else
-                                      aux q
-    end in aux env.vars
+    | []    ->
+        raise Not_found 
+    | cv::q -> 
+        begin match cv with
+          | CVar (i, t) ->  if i = id then (t, true)  else aux q
+          | CVal (i, t) ->  if i = id then (t, false) else aux q
+        end
+  in aux env.vars
 
 (* ident -> tclasse -> tmethode *)
 let meth_lookup m_id env =
@@ -132,4 +130,27 @@ let meth_lookup m_id env =
         else
           aux q
   in aux env.meths
+
+(* La classe Array[S] 
+ * loc -> tclasse *)
+let array_tc l =
+  let tptcs = [{
+    tptc_cont = TPTCrien {
+      tpt_cont = ("S", None);
+      tpt_loc = l 
+      };
+    tptc_loc = l
+    }] in {
+  cc_name   = "Array";
+  cc_tptcs  = tptcs;
+  cc_params = [];
+  cc_deriv  = None;
+  cc_env = (add_classe_env (env0 ()) {
+    cc_name   = "S";
+    cc_tptcs  = [];
+    cc_params = [];
+    cc_deriv  = None;
+    cc_env    = env0 ()
+  })
+}
 
