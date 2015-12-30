@@ -48,7 +48,7 @@ let rec add_one_key id t m =
           if cid = id then
             t
           else
-            Tclasse (cid, s)
+            Tclasse (cid, add_one_key id t s)
         else
           if id = cid then
             t

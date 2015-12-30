@@ -548,9 +548,8 @@ let rec type_expr env tro e = match e.e_cont with
             "référence à aucune classe connue."))
       (* On fabrique la substitution définie par argst *)
       in let targst = targst_of_argst env argst in
-      let s = subst_from_lists
-        (List.map tpt_of_tptc c.cc_tptcs)
-        targst.tat_cont in 
+      let s =
+        subst_from_lists (List.map tpt_of_tptc c.cc_tptcs) targst.tat_cont in 
       (* On vérifie que le type C[sigma = s] est bien formé. *)
       begin match (is_bf env e.e_loc (Tclasse (cid, s))) with
         | Some eloc ->
@@ -569,9 +568,8 @@ let rec type_expr env tro e = match e.e_cont with
       let welltyped = begin try
         let f o e' p = begin match o with
           | None ->
-              let b' = is_sstype env e'.te_loc e'.te_typ
-                        (subst s p.tp_typ) in
-              if b' then
+              let ok = is_sstype env e'.te_loc e'.te_typ (subst s p.tp_typ) in
+              if ok then
                 None
               else
                 Some e'.te_loc
@@ -947,7 +945,8 @@ let alpha_eq m1 m2 =
                         let b1 = snd (List.hd tpts1).tpt_cont in
                         let b2 = snd (List.hd tpts2).tpt_cont in
                         match (b1, b2) with
-                          | (None, None) -> true
+                          | (None, _) -> true
+                          | (_, None) -> true
                           | (Some (HTinf tb1), (Some (HTinf tb2))) ->
                               ignore (f cset [tb1] [tb2]);
                               true
@@ -959,7 +958,7 @@ let alpha_eq m1 m2 =
                       if not bornes_ok then 
                         raise (TypeError (m1.tm_loc, "Impossible de surcharger"^
                         "la méthode "^m1.tm_name^", les types des paramètres"^
-                        "sont incompatibles."));
+                        " sont incompatibles."));
                       f (Cset.add (cid1, cid2) cset) q1 q2  
                   | Some (_, id2) ->
                       if id2 <> cid2 then
@@ -982,6 +981,8 @@ let alpha_eq m1 m2 =
                 "sont différentes, la méthode "^m1.tm_name^" ne peut pas "^
                 "être surchargée."))
           (* Pour les types builtin, il suffit de tester leur égalité. *)
+          | Tclasse(_, _), _ -> cset
+          | _, Tclasse(_, _) -> cset
           | t1, t2 ->
               if t1 = t2 then
                 f cset q1 q2
