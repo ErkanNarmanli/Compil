@@ -3,7 +3,7 @@ Mini-Scala
 
 Description
 -----------
-Ce projet à été réalisé par Martin Pépin et Erkan Narmanli, élèves à l'École normale supérieur dans le cadre du cours de compilation dispensé par Jean-Christophe Filliâtre. Cela consiste en l'implémentation d'un compilateur pour le Mini-Scala, un fragment du langage Scala, dont la description se trouve [sur cette page](https://www.lri.fr/~filliatr/ens/compil/). Le compilateur produit alors un code en assembleur X86-64.
+Ce projet à été réalisé par Martin Pépin et Erkan Narmanli, élèves à l'École normale supérieur dans le cadre du cours de compilation dispensé par Jean-Christophe Filliâtre. Cela consiste en l'implémentation d'un compilateur pour le Mini-Scala, un fragment du langage Scala, dont la description se trouve [sur cette page](https://www.lri.fr/~filliatr/ens/compil/). Le compilateur produit alors un code en assembleur x86-64.
 
 ### Choix techniques
 
