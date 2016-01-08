@@ -1,6 +1,6 @@
-CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo misc.cmo context.cmo substitution.cmo printing.cmo variance.cmo typer.cmo main.cmo
+CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo misc.cmo context.cmo substitution.cmo printing.cmo variance.cmo typer.cmo x86_64.cmo compile.cmo main.cmo
 GENERATED=lexer.ml parser.ml parser.mli parser.automaton
-BIN=main
+BIN=pscala
 FLAGS=-w +A-4
 
 make: $(CMO)
@@ -24,7 +24,7 @@ parser.ml: ast.cmi
 
 clean:
 	rm *.cmi *.cmo
-	rm main
+	rm $(BIN)
 	rm $(GENERATED)
 
 .depend depend: $(GENERATED)

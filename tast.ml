@@ -55,6 +55,7 @@ and context = {
 and tfichier = {
     tclasses    : tclasse list ;
     tmain       : tclasse_Main ;
+    f_env       : context
     }
 
 and tclasse = {

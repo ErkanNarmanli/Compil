@@ -644,7 +644,6 @@ let rec type_expr env tro e = match e.e_cont with
         (* Si la méthode a été typée récemment, elle n'est pas encore
          * dans c.cc_env mais elle est dans env *)
         | Not_found ->
-            Printf.printf "hello ?\n";
             begin try
               meth_lookup m_id env
             with
@@ -655,7 +654,6 @@ let rec type_expr env tro e = match e.e_cont with
       end in
       (* On calcule les types donnés en argument et on stocke leur 
        * localisation au passage. *)
-      Printf.printf "Calcul des arguments de types.\n"; flush stdout;
       let taus = List.map (typerType_of_typ env) (get_list argst.at_cont)
       (* On vérifie que ces types sont bien formés. *)
       in let f eloc_o t =
@@ -1495,7 +1493,7 @@ let type_classe_Main env cm =
         raise (TypeError (cm.cM_loc, "La méthode main doit avoit un "^
         "paramètre avec le type Array[String].")) end;
 
-  let _, tc = type_classe (add_classe_env env (array_tc (List.hd ps).p_loc)) {
+  let env, tc = type_classe (add_classe_env env (array_tc (List.hd ps).p_loc)) {
     c_name = "Main";
     type_class_params = None;
     params = None;
@@ -1503,7 +1501,7 @@ let type_classe_Main env cm =
     decls = cm.cM_cont;
     c_loc = cm.cM_loc
   } in
-  {
+  env, {
     tcM_cont = tc.tdecls;
     tcM_loc  = tc.tc_loc;
     tcM_env  = tc.tc_env
@@ -1518,12 +1516,11 @@ let type_fichier f =
           (e, tc::l))
       (env0 (), [])
       f.f_classes in
-  print_endline "Les classes connues avant de typer la classe Main :";
-  List.iter (fun cc -> print_endline cc.cc_name; flush stdout) gamma.classes;
-  let tcm = type_classe_Main gamma f.main in
+  let env, tcm = type_classe_Main gamma f.main in
   {
     tclasses = List.rev classes;
-    tmain = tcm
+    tmain = tcm;
+    f_env = env
   }
 
 

@@ -7,19 +7,25 @@ open Typer
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
+let type_only = ref false
 let pprint = ref false
 
 (* Noms des fichiers source et cible *)
 let ifile = ref ""
-let ofile = ref ""
+let ofile = ref "a"
 
 let set_file f s = f := s
 
 (* Les options du compilateur que l'on affiche avec --help *)
 let options =
-  ["-parse-only", Arg.Set parse_only,
-   "  Pour ne faire uniquement que la phase d'analyse syntaxique";
-   "-pprint", Arg.Set pprint, " Pour n'afficher que les erreurs"
+  ["--parse-only", Arg.Set parse_only,
+   " Pour faire uniquement la phase d'analyse lexicale.";
+   "--type-only", Arg.Set type_only,
+   " Pour n'effectuer que le typage.";
+   "-o", Arg.String (set_file ofile), 
+   "<file>  Pour indiquer le nom du fichier de sortie."; 
+   "--pprint", Arg.Set pprint,
+   " Pour afficher le résultat de l'analyse lexicale."
   ]
 
 let usage = "usage: main [option] file.scala"
@@ -65,16 +71,19 @@ let () =
        le prochain token. *)
    
     let p = Parser.fichier Lexer.token buf in
+    close_in f;
+    
     if !pprint then
       Ppast.print p; 
     
-    close_in f;
-    
-    
-    (* On s'arrête ici si on ne veut faire que le parsing *)
+    (* On s'arrête ici si on ne veut faire que le parsing. *)
     if !parse_only then exit 0;
     
-    let _ = type_fichier p in ()
+    let p = type_fichier p in
+    (* On s'arrête ici si on ne veut faire que le typage. *)
+    if !type_only then exit 0;
+
+    Compile.compile_fichier p !ofile;
 
     (*Interp.fichier p*)
   with
