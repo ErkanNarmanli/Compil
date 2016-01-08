@@ -16,13 +16,13 @@ let new_str_id =
 
 let rec compile_expr e = match e.te_cont with
   | TEvoid ->
-      assert false
+      movq (imm 0) (reg rdi), nop
   | TEthis ->
       assert false
   | TEnull ->
       assert false
   | TEint n ->
-      pushq (imm n), nop
+      movq (imm n) (reg rdi), nop
   | TEstr s ->
       (* Création d'une chaîne de caractère dans data. *)
       let strid = new_str_id () in 
@@ -33,11 +33,13 @@ let rec compile_expr e = match e.te_cont with
         call "malloc" ++
         movq (ilab "D_String") (ind rax) ++
         movq (ilab strid) (ind ~ofs:8 rax) ++
-        (* On place le résultat sur la pile. *)
-        pushq (reg rax) in
+        (* On place le résultat dans %rdi. *)
+        movq (reg rax) (reg rdi) in
       text, data
-  | TEbool b ->
-      assert false
+  | TEbool true ->
+      movq (imm 1) (reg rdi), nop
+  | TEbool false ->
+      movq (imm 0) (reg rdi), nop
   | TEacc a ->
       assert false
   | TEacc_exp (a, e) ->
@@ -47,9 +49,13 @@ let rec compile_expr e = match e.te_cont with
   | TEnew (i, at, es) ->
       assert false
   | TEneg e ->
-      assert false
+      let text, data = compile_expr e in
+      let text = text ++ notq (reg rdi) in
+      text, data
   | TEmoins e ->
-      assert false
+      let text, data = compile_expr e in
+      let text = text ++ negq (reg rdi) in
+      text, data
   | TEbinop (b, e1, e2) ->
       assert false
   | TEifelse (eb, e1, e2) ->
@@ -57,12 +63,14 @@ let rec compile_expr e = match e.te_cont with
   | TEwhile (cond, e) ->
       assert false
   | TEreturn None ->
-      assert false
+      movq (reg rdi) (reg rax) ++ ret, nop
   | TEreturn (Some e) ->
-      assert false
+      (* TODO : Pas sûr à 100% *)
+      let text, data = compile_expr e in
+      text ++ movq (reg rdi) (reg rax) ++ ret, data
   | TEprint e ->
       let code, data = compile_expr e in
-      code ++ popq rdi ++ begin match e.te_typ with
+      code ++ begin match e.te_typ with
         | Tint -> call "print_int"
         | Tstring ->
             movq (ind ~ofs:8 rdi) (reg rdi) ++ 
