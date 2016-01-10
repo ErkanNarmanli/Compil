@@ -12,7 +12,7 @@ let pprint = ref false
 
 (* Noms des fichiers source et cible *)
 let ifile = ref ""
-let ofile = ref "a"
+let ofile = ref ""
 
 let set_file f s = f := s
 
@@ -56,6 +56,11 @@ let () =
     Arg.usage options usage;
     exit 1
   end;
+
+  (* Si le fichier de sortie n'est pas spécifié, c'est le même que le fichier
+   * d'entrée mais avec l'extension .s *)
+  if !ofile="" then
+    ofile := Filename.chop_suffix !ifile "cala";
 
   (* Ouverture du fichier source en lecture *)
   let f = open_in !ifile in

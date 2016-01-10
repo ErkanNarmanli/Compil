@@ -34,7 +34,7 @@ clean:
 include .depend
 
 test: make
-	./test -2 ./$(BIN)
+	./test -3 ./$(BIN)
 
 stats: make
 	./stats -w
