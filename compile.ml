@@ -1,4 +1,5 @@
 open X86_64
+open Ast
 open Tast
 open Misc 
 open Context
@@ -12,8 +13,24 @@ let new_str_id =
   let i = ref (-1) in
   (fun () ->
     incr i;
-    ("str_"^(string_of_int !i)))
+    "str_"^(string_of_int !i))
 
+let new_while_id = 
+  let i = ref (-1) in
+  (fun () ->
+    incr i;
+    let i = string_of_int !i in
+    "while_beg"^i, "while_end"^i)
+
+let new_if_id = 
+  let i = ref (-1) in
+  (fun () ->
+    incr i;
+    let i = string_of_int !i in
+    "else_"^i)
+
+(* Produit le code compilant une expression. Le résulat est placé dans %rdi.
+ * texpr -> text * data *)
 let rec compile_expr e = match e.te_cont with
   | TEvoid ->
       movq (imm 0) (reg rdi), nop
@@ -57,11 +74,39 @@ let rec compile_expr e = match e.te_cont with
       let text = text ++ negq (reg rdi) in
       text, data
   | TEbinop (b, e1, e2) ->
-      assert false
+      let code1, data1 = compile_expr e1 in
+      let code2, data2 = compile_expr e2 in
+      let op = begin match b.tb_cont with
+        | Add -> addq
+        | Sub -> subq
+        | Mul -> imulq
+        | Div -> assert false
+        | Mod -> assert false
+        | And -> andq
+        | Or  -> orq
+        | _ -> assert false
+      end in
+      let code =
+        code1 ++ pushq (reg rdi) ++
+        code2 ++
+        popq rsi ++ op (reg rsi) (reg rdi) in
+      code, data1 ++ data2
   | TEifelse (eb, e1, e2) ->
-      assert false
+      let ct, cd = compile_expr eb in
+      let e1t, e1d = compile_expr e1 in
+      let e2t, e2d = compile_expr e2 in
+      let lelse = new_if_id () in
+      let code = ct ++ cmpq (imm 0) (reg rdi) ++ je lelse ++
+        e1t ++ label lelse ++ e2t in
+      code, cd ++ e1d ++ e2d
   | TEwhile (cond, e) ->
-      assert false
+      let lbeg, lend = new_while_id () in
+      let ctext, cdata = compile_expr cond in
+      let etext, edata = compile_expr e in
+      let code = 
+        label lbeg ++ ctext ++ cmpq (imm 0) (reg rdi) ++ je lend ++
+        etext ++ jmp lbeg ++ label lend in
+      code, cdata ++ edata
   | TEreturn None ->
       movq (reg rdi) (reg rax) ++ ret, nop
   | TEreturn (Some e) ->
@@ -75,6 +120,7 @@ let rec compile_expr e = match e.te_cont with
         | Tstring ->
             movq (ind ~ofs:8 rdi) (reg rdi) ++ 
             call "printf"
+        | _ -> failwith "Le typeur aurait dû refuser ce programme."
       end, data
   | TEbloc b ->
       let compile_decl (text, data) ins =

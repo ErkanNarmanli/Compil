@@ -4,7 +4,6 @@ open Ast
 
 (*ON DÉFINIT DES OBJETS QUI SERONT UTILES PLUS TARD*)
 type loc    = Lexing.position * Lexing.position (* début, fin *)
-type ident  = string
 module Smap = Map.Make(String)
 
 type typerType =
