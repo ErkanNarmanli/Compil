@@ -8,12 +8,23 @@ module Smap = Map.Make(String)
 
 let (cfields : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17
 
+let rec popn = function
+  | 0 -> nop
+  | n when n < 0 ->
+      failwith "WTF"
+  |n -> popq rsi ++ (popn (n-1))
 
 let new_str_id = 
   let i = ref (-1) in
   (fun () ->
     incr i;
     "str_"^(string_of_int !i))
+
+let new_lazy_id = 
+  let i = ref (-1) in
+  (fun () ->
+    incr i;
+    "lazy_"^(string_of_int !i))
 
 let new_while_id = 
   let i = ref (-1) in
@@ -27,11 +38,15 @@ let new_if_id =
   (fun () ->
     incr i;
     let i = string_of_int !i in
-    "else_"^i)
+    "else_"^i, "end_if_"^i)
+
+let lazyop = function
+  | And | Or -> true
+  | _ -> false
 
 (* Produit le code compilant une expression. Le résulat est placé dans %rdi.
- * texpr -> text * data *)
-let rec compile_expr env cid e = match e.te_cont with
+ * texpr -> text * data * int *)
+let rec compile_expr env cid stack_size e = match e.te_cont with
   | TEvoid ->
       (* On rend 0. *)
       xorq (reg rdi) (reg rdi), nop
@@ -49,7 +64,7 @@ let rec compile_expr env cid e = match e.te_cont with
       (* Création d'une chaîne de caractère dans data. *)
       let strid = new_str_id () in 
       let data = label strid ++ string s in 
-      let text = 
+      let text =
         (* Instanciation de l'objet de la classe String. *)
         movq (imm 16) (reg rdi) ++
         call "malloc" ++
@@ -62,8 +77,27 @@ let rec compile_expr env cid e = match e.te_cont with
       movq (imm 1) (reg rdi), nop
   | TEbool false ->
       xorq (reg rdi) (reg rdi), nop
-  | TEacc _ ->
-      assert false
+  | TEacc a ->
+      begin match a.ta_cont with
+        | TAident i ->
+            (* On va chercher la position de la variable locale i sur la pile et
+             * on place sa valeur dans %rdi. *)
+            let ofs = Smap.find i env in
+            movq (ind ~ofs:ofs rbp) (reg rdi), nop
+        | TAexpr_ident (e, i) ->
+            (* On compile l'objet de l'expression e puis on va chercher la
+             * valeur de son champ i. *)
+            let text, data = compile_expr env cid stack_size e in
+            let cname = begin match e.te_typ with
+              | Tclasse (cid, _) -> cid
+              | _ -> failwith "WTF"
+            end in
+            let ofs = Hashtbl.find cfields (cname, i) in
+            let text = text ++
+              movq (reg rsi) (ind ~ofs:ofs rdi) ++
+              movq (reg rsi) (reg rdi) in
+            text, data
+      end
   | TEacc_exp (_, _) ->
       assert false
   | TEacc_typ_exp (_, _, _, _) ->
@@ -71,60 +105,106 @@ let rec compile_expr env cid e = match e.te_cont with
   | TEnew (i, _, es) ->
       (* On place this sur la pile. *)
       let ofs = Smap.find "this" env in
-      let text = movq (ind ~ofs:ofs rbp) (reg rdi) ++ pushq (reg rdi) in
+      let text = 
+        movq (ind ~ofs:ofs rbp) (reg rdi) ++ pushq (reg rdi) in
       (* On compile les arguments du constructeur. *)
-      let comp_arg (text, data) e =
-        let t, d = compile_expr env cid e in
-        text ++ t ++ pushq (reg rdi), data ++ d in
-      let text, data =
-        List.fold_left comp_arg (text, nop) es in
-      text ++ call ("M_"^i^"_new"), data
+      let comp_arg (text, data, i) e =
+        let t, d = compile_expr env cid (stack_size+i*8) e in
+        text ++ t ++ pushq (reg rdi), data ++ d, i+1 in
+      let text, data, tot =
+        List.fold_left comp_arg (text, nop, 1) es in
+      (* On appelle le constructeur. *)
+      let text = text ++ call ("M_"^i^"_new") in
+      (* On dépile les arguments et le this. *)
+      text ++ (popn tot), data
   | TEneg e ->
-      let text, data = compile_expr env cid e in
-      let text = text ++ notq (reg rdi) in
-      text, data
+      (* Négation d'un booléen. *)
+      let text, data = compile_expr env cid stack_size e in
+      text ++ notq (reg rdi) , data
   | TEmoins e ->
-      let text, data = compile_expr env cid e in
-      let text = text ++ negq (reg rdi) in
-      text, data
-  | TEbinop (b, e1, e2) ->
-      let code1, data1 = compile_expr env cid e1 in
-      let code2, data2 = compile_expr env cid e2 in
+      (* Opposé d'un entier. *)
+      let text, data = compile_expr env cid stack_size e in
+      text ++ negq (reg rdi), data
+  | TEbinop (b, e1, e2) when not (lazyop b.tb_cont)->
+      let code1, data1 = compile_expr env cid (stack_size+8) e1 in
+      let code2, data2 = compile_expr env cid stack_size e2 in
       let op = begin match b.tb_cont with
         | Add -> addq (reg rsi) (reg rdi)
         | Sub -> subq (reg rsi) (reg rdi)
         | Mul -> imulq (reg rsi) (reg rdi)
-        | Div -> assert false
-        | Mod -> assert false
-        | And -> andq (reg rsi) (reg rdi)
-        | Or  -> orq (reg rsi) (reg rdi)
-        | Eq  ->
+        | Div ->
+            movq (reg rdi) (reg rax) ++
+            xorq (reg rdx) (reg rdx) ++
+            idivq (reg rsi) ++
+            movq (reg rax) (reg rdi)
+        | Mod ->
+            movq (reg rdi) (reg rax) ++
+            xorq (reg rdx) (reg rdx) ++
+            idivq (reg rsi) ++
+            movq (reg rdx) (reg rdi)
+        | Eq | EqRef ->
             cmpq (reg rsi) (reg rdi) ++
             sete (reg dil) ++
             movzbq (reg dil) rdi
-        | Ne  ->
+        | Ne | NeRef ->
             cmpq (reg rsi) (reg rdi) ++
             setne (reg dil) ++
             movzbq (reg dil) rdi
-        | _ -> assert false
+        | Le -> 
+            cmpq (reg rdi) (reg rsi) ++
+            setle (reg dil) ++
+            movzbq (reg dil) rdi
+        | Ge -> 
+            cmpq (reg rdi) (reg rsi) ++
+            setge (reg dil) ++
+            movzbq (reg dil) rdi
+        | Lt -> 
+            cmpq (reg rdi) (reg rsi) ++
+            setl (reg dil) ++
+            movzbq (reg dil) rdi
+        | Gt -> 
+            cmpq (reg rdi) (reg rsi) ++
+            setg (reg dil) ++
+            movzbq (reg dil) rdi
+        | And | Or -> failwith "Ces opérateurs ne doivent pas être gérés ici."
       end in
       let code =
-        code1 ++ pushq (reg rdi) ++
-        code2 ++
+        code2 ++ pushq (reg rdi) ++
+        code1 ++
         popq rsi ++ op in
       code, data1 ++ data2
+  | TEbinop (b, e1, e2) ->
+      let t1, d1 = compile_expr env cid stack_size e1 in
+      let t2, d2 = compile_expr env cid stack_size e2 in
+      let next = new_lazy_id () in
+      let text = begin match b.tb_cont with
+        | And ->
+            t1 ++ cmpq (imm 0) (reg rdi) ++
+            je next ++
+            t2 ++ cmpq (imm 0) (reg rdi) ++
+            setne (reg dil) ++ movzbq (reg dil) rdi ++
+            label next
+        | Or  ->
+            t1 ++ cmpq (imm 0) (reg rdi) ++
+            jne next ++
+            t2 ++
+            label next    
+        | _ -> failwith "On ne traite ici que les opérateurs paresseux."
+      end in
+      text, d1 ++ d2
   | TEifelse (eb, e1, e2) ->
-      let ct, cd = compile_expr env cid eb in
-      let e1t, e1d = compile_expr env cid e1 in
-      let e2t, e2d = compile_expr env cid e2 in
-      let lelse = new_if_id () in
+      let ct, cd = compile_expr env cid stack_size eb in
+      let e1t, e1d = compile_expr env cid stack_size e1 in
+      let e2t, e2d = compile_expr env cid stack_size e2 in
+      let lelse, lend = new_if_id () in
       let code = ct ++ cmpq (imm 0) (reg rdi) ++ je lelse ++
-        e1t ++ label lelse ++ e2t in
+        e1t ++ jmp lend ++
+        label lelse ++ e2t ++ label lend in
       code, cd ++ e1d ++ e2d
   | TEwhile (cond, e) ->
       let lbeg, lend = new_while_id () in
-      let ctext, cdata = compile_expr env cid cond in
-      let etext, edata = compile_expr env cid e in
+      let ctext, cdata = compile_expr env cid stack_size cond in
+      let etext, edata = compile_expr env cid stack_size e in
       let code = 
         label lbeg ++ ctext ++ cmpq (imm 0) (reg rdi) ++ je lend ++
         etext ++ jmp lbeg ++ label lend in
@@ -134,7 +214,7 @@ let rec compile_expr env cid e = match e.te_cont with
         | None ->
             xorq (reg rax) (reg rax), nop
         | Some e ->
-            let text, data = compile_expr env cid e in
+            let text, data = compile_expr env cid stack_size e in
             text ++ movq (reg rdi) (reg rax), data
       end in
       let text = text ++
@@ -142,7 +222,7 @@ let rec compile_expr env cid e = match e.te_cont with
         popq rbp in 
       text ++ ret, data
   | TEprint e ->
-      let code, data = compile_expr env cid e in
+      let code, data = compile_expr env cid stack_size e in
       code ++ begin match e.te_typ with
         | Tint -> call "print_int"
         | Tstring ->
@@ -152,16 +232,26 @@ let rec compile_expr env cid e = match e.te_cont with
         | _ -> failwith "Le typeur aurait dû refuser ce programme."
       end, data
   | TEbloc b ->
-      List.fold_left (compile_instr env cid) (nop, nop) b
+      let text, data, _, new_stack  =
+        List.fold_left (compile_instr cid) (nop, nop, env, stack_size) b in
+      text ++ popn ((new_stack - stack_size)/8), data
 
-and compile_instr env cid (text, data) ins =
-  let t, d = begin match ins with
-    | TIvar v -> compile_var env cid v
-    | TIexpr e -> compile_expr env cid e
-  end in
-  text ++ t, data ++ d
+and compile_instr cid (text, data, env, stack_size) = function
+  | TIvar v ->
+      let t, d, env = compile_var env cid stack_size v in
+      (text ++ t, data ++ d, env, stack_size+8)
+  | TIexpr e ->
+      let t, d = compile_expr env cid stack_size e in
+      (text ++ t, data ++ d, env, stack_size)
 
-and compile_var _ _ _ = assert false
+and compile_var env cid stack_size v =
+  let i, e =  match v.tv_cont with
+    | TVar(i, _, e) -> i, e
+    | TVal(i, _, e) -> i, e in
+  let text, data = compile_expr env cid stack_size e in
+  let text = text ++ pushq (reg rdi) in
+  let stack_size = stack_size + 8 in
+  text, data, Smap.add i (-stack_size) env
 
 let compile_meth cid (text, data) = function
   | TDvar _ -> (text, data)
@@ -173,10 +263,10 @@ let compile_meth cid (text, data) = function
       (* Construction de l'environnement pour les variables sur la pile. *)
       let len = List.length m.tm_params in
       let env, _ = List.fold_left (fun (env, i) p ->
-        Smap.add p.tp_name (8*(len-i)) env, i+1
-        ) (Smap.singleton "this" (8*len), 0) m.tm_params in
+        Smap.add p.tp_name (8*(len-i+1)) env, i+1
+        ) (Smap.singleton "this" (8*(len+2)), 0) m.tm_params in
       (* Compilation du corps de la méthode. *)
-      let et, ed = compile_expr env cid m.tm_res_expr in
+      let et, ed = compile_expr env cid 0 m.tm_res_expr in
       let text, data = text ++ et ++ xorq (reg rax) (reg rax), data ++ ed in
       (* On restore %rbp et %rsp. *)
       let text = text ++
@@ -240,11 +330,11 @@ let make_constr c =
     movq (ilab ("D_"^c.tc_name)) (ind rbx)  in
   let text, env, _ = List.fold_left (fun (t, env, i) p ->
     (* Arguments du constructeur. *)
-    t ++ movq (ind ~ofs:(8*(len-i)) rbp) (reg rdi) ++
+    t ++ movq (ind ~ofs:(8*(len-i+1)) rbp) (reg rdi) ++
     movq (reg rdi) (ind ~ofs:(Hashtbl.find cfields (c.tc_name, p.tp_name)) rbx),
-    Smap.add p.tp_name (8*(len -i)) env,
+    Smap.add p.tp_name (8*(len-i+1)) env,
     i+1
-    ) (text, Smap.singleton "this" 0, 0) c.tparams in
+    ) (text, Smap.singleton "this" (-8), 0) c.tparams in
     (* Variables du corps de la classe. *)
   let text, data = List.fold_left (fun (t, d) decl -> match decl with 
       | TDvar v ->
@@ -252,7 +342,7 @@ let make_constr c =
             | TVar (i, _, e) -> i, e
             | TVal (i, _, e) -> i, e
           end in
-          let vt, vd = compile_expr env c.tc_name e in
+          let vt, vd = compile_expr env c.tc_name 8 e in
           let ofs = Hashtbl.find cfields (c.tc_name, i) in
           let text = t ++ vt ++ movq (reg rdi) (ind ~ofs:ofs rbx) in
           text, d ++ vd
@@ -321,7 +411,7 @@ let compile_fichier f ofile =
       print_int_code;
     data = data ++
       builtin_classes ++ 
-      label ".Sprint_int" ++ string "%d\n";
+      label ".Sprint_int" ++ string "%d";
   } in
   print_in_file ~file:ofile prog
 
