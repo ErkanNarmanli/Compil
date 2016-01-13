@@ -45,7 +45,7 @@ show_warns () {
     if [ $nowarn -eq 1 ]; then
         echo "Toutes les fonctions sont utilisées au moins une fois."
     else
-        echo "Les fonctions ci-dessous ne sont jamais utilisées dans le programme :"
+        echo "Les fonctions/valeurs ci-dessous ne sont jamais utilisées dans le programme :"
         for val in $warnings; do
             echo " - $val"
         done
@@ -57,7 +57,7 @@ for f in $files; do
     echo "Fonctions du fichier $f :"
     liste=$(ocamlc -i $f | grep -o "^val [a-Z0-1_]\+" | sed "s/^val //")
     echo $liste | while read val; do
-        nb=$(cat *.ml | grep -o "[^a-Z0-9_]${val}[ ()]" | wc -l)
+        nb=$(cat *.ml | grep -o "[^a-Z0-9_]${val}[ (),;]" | wc -l)
         if [ $nb -eq 1 ]; then
             warnings+=$val
             nowarn=0
