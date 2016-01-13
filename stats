@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 
-files=("misc.ml" "substitution.ml" "context.ml" "variance.ml" "printing.ml" "typer.ml")
+files=("misc.ml" "substitution.ml" "context.ml" "variance.ml" "printing.ml" "typer.ml" "compile.ml")
 
 OPTIND=1
 warnings=()
