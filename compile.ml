@@ -7,7 +7,7 @@ open Context
 module Smap = Map.Make(String)
 
 let (cfields : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17
-let (cmeths : ((ident * ident), string) Hashtbl.t) = Hashtbl.create 17 
+let (cmeths : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17 
 
 let rec popn = function
   | 0 -> nop
@@ -148,7 +148,8 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
       (* On compile l'expression qui appelle la méthode et on la met
       * sur la pile (c'est le this dans la méthode). *)
       let text, data = compile_expr env cid stack_size e in
-      let text = text ++ pushq (reg rdi) in 
+      let text = text ++
+        pushq (reg rdi) ++ movq (reg rdi) (reg rbx) in 
       (* On empile ensuite les arguments de la méthode. *)
       let text, data, tot = List.fold_left (fun (text, data, i) e ->
         let et, ed = compile_expr env cid (stack_size + 8*i) e in
@@ -159,13 +160,15 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         | Tclasse (cid, _) -> cid
         | _ -> failwith "WTF"
       end in 
-      let mname = begin try
+      let mofs = begin try
         Hashtbl.find cmeths (cname, m) 
       with
         | Not_found ->
             failwith ("La méthode "^m^" de "^cname^" est inconnue.")
       end in
-      let text = text ++ call mname in
+      let text = text ++
+        movq (ind rbx) (reg r8) ++
+        call_star (ind ~ofs:mofs r8) in
       (* On dépile les arguments et on place le résulat dans %rdi. *)
       let text = text ++ movq (reg rax) (reg rdi) ++ (popn tot) in
       text, data
@@ -272,9 +275,11 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
       let e1t, e1d = compile_expr env cid stack_size e1 in
       let e2t, e2d = compile_expr env cid stack_size e2 in
       let lelse, lend = new_if_id () in
-      let code = ct ++ cmpq (imm 0) (reg rdi) ++ je lelse ++
-        e1t ++ jmp lend ++
-        label lelse ++ e2t ++ label lend in
+      let code =
+        comment "if" ++ ct ++
+        cmpq (imm 0) (reg rdi) ++ je lelse ++
+        comment "then" ++ e1t ++ jmp lend ++
+        comment "else" ++ label lelse ++ e2t ++ label lend in
       code, cd ++ e1d ++ e2d
   | TEwhile (cond, e) ->
       let lbeg, lend = new_while_id () in
@@ -326,7 +331,8 @@ and compile_var env cid stack_size v =
     | TVar(i, _, e) -> i, e
     | TVal(i, _, e) -> i, e in
   let text, data = compile_expr env cid stack_size e in
-  let text = text ++ pushq (reg rdi) in
+  let text = text ++
+    pushq (reg rdi) ++ xorq (reg rdi) (reg rdi) in
   let stack_size = stack_size + 8 in
   text, data, Smap.add i (-stack_size) env
 
@@ -347,8 +353,9 @@ let compile_meth cid (text, data) = function
       (* Compilation du corps de la méthode. *)
       let et, ed = compile_expr env cid 8 m.tm_res_expr in
       let text, data = text ++ et ++ movq (reg rdi) (reg rax), data ++ ed in
-      (* On restore %rbp et %rsp. *)
+      (* On restore %rbp, %rsp et %rbx. *)
       let text = text ++
+        movq (ind ~ofs:(-8) rbp) (reg rbx) ++
         movq (reg rbp) (reg rsp) ++
         popq rbp in
       text ++ ret, data
@@ -448,17 +455,13 @@ let make_constr c =
     popq rbp in 
   text ++ ret, data
 
-
 let compile_class (t, d) c =
   (* Ajout des positions des champs de la classe dans la table. *)
-  Printf.printf "class %s {" c.tc_name;
   let pos = ref 0 in
   List.iter (fun v ->
       incr pos;
-      Printf.printf "v %s ; " (get_cv_id v); 
       Hashtbl.add cfields (c.tc_name, get_cv_id v) (8 * (!pos))
       ) (List.rev c.tc_env.vars); 
-  print_endline "}";
   (* Nom de la classe et de la classe mère. *)
   let head = begin
     label ("D_"^c.tc_name) ++
@@ -471,8 +474,8 @@ let compile_class (t, d) c =
           failwith "On n'arrive pas là."
   end in
   (* Étiquettes des méthodes *)
-  let meths = 
-    List.fold_left (fun ms m ->
+  let meths, _ = 
+    List.fold_left (fun (ms, i) m ->
         let c' = begin try
           classe_lookup c.tc_env c.tc_name
         with
@@ -481,9 +484,9 @@ let compile_class (t, d) c =
         end in
         let cname = get_meth_owner c.tc_env m c' in
         let mname = "M_"^cname^"_"^m.tm_name in
-        Hashtbl.add cmeths (c.tc_name, m.tm_name) mname;
-        ms ++ address [mname]
-        ) nop c.tc_env.meths in
+        Hashtbl.add cmeths (c.tc_name, m.tm_name) i;
+        ms ++ address [mname], i+8
+        ) (nop, 8) (List.rev c.tc_env.meths) in
   (* Compilation du corps de la classe. *)
   let new_t, new_d = make_constr c in
   let meths_t, meths_d =

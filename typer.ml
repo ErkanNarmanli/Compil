@@ -1215,7 +1215,10 @@ let type_decl (env, tdl) d = match d.decl_cont with
             classe_lookup env cid
         | _ -> failwith "On n'arrive pas ici."
       end in
-      let env' = add_tmeth_env env tm'' in
+      let env' = if tm''.tm_override then
+          update_meth_env tm'' env
+        else
+          add_tmeth_env env tm'' in
       let env' = update_classe_env (set_classe_env env' c) env' in
       (env', (TDmeth tm'')::tdl)  
       
@@ -1387,7 +1390,7 @@ let type_classe env c =
                       classes = !gamma'.classes;
                       constrs = !gamma'.constrs;
                       vars    = (!gamma'.vars) @ add_vars;
-                      meths   = add_meths @ (!gamma'.meths);
+                      meths   = (!gamma'.meths) @ add_meths;
                       }
                 (* Si on essaie d'hériter d'autre chose que d'une classe, on
                  * râle. *)

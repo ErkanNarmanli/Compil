@@ -97,7 +97,7 @@ let update_classe_env c env =
   }
 
 (* Change la définition d'une variable dans l'environnement.
- * context_classe -> context -> context *)
+ * context_var -> context -> context *)
 let update_var_env cv env =
   let vid = get_cv_id cv in
   let update cv' = 
@@ -110,6 +110,21 @@ let update_var_env cv env =
     constrs = env.constrs;
     vars    = List.map update env.vars;
     meths   = env.meths;
+  }
+
+(* Change la définition d'une méthode dans l'environnement.
+ * tmethode -> context -> context *)
+let update_meth_env m env =
+  let update m' = 
+    if m'.tm_name = m.tm_name then
+      m
+    else
+      m' in
+  {
+    classes = env.classes;
+    constrs = env.constrs;
+    vars    = env.vars;
+    meths   = List.map update env.meths;
   }
 
 (* Cherche une classe dans l'environnement env.
