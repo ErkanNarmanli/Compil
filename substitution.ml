@@ -237,7 +237,7 @@ and update_meth s m =
   let env = update_env s m.tm_env in
   {
     tm_name         = m.tm_name;
-    tm_override     = m.tm_override;
+    tm_override     = false;
     tm_type_params  = m.tm_type_params;
     tm_params       = params;
     tm_res_type     = res_type;

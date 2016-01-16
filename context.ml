@@ -1,4 +1,5 @@
 open Tast
+open Misc
 
 (* L'environnement vide *)
 let env0 () = 
@@ -95,6 +96,22 @@ let update_classe_env c env =
     meths   = env.meths;
   }
 
+(* Change la définition d'une variable dans l'environnement.
+ * context_classe -> context -> context *)
+let update_var_env cv env =
+  let vid = get_cv_id cv in
+  let update cv' = 
+    if get_cv_id cv' = vid then
+      cv
+    else
+      cv' in
+  {
+    classes = env.classes;
+    constrs = env.constrs;
+    vars    = List.map update env.vars;
+    meths   = env.meths;
+  }
+
 (* Cherche une classe dans l'environnement env.
  * context -> ident -> context_classe *)
 let classe_lookup env id = 
@@ -121,7 +138,7 @@ let var_lookup env id =
   in aux env.vars
 
 (* ident -> tclasse -> tmethode *)
-let meth_lookup m_id env =
+let meth_lookup env m_id =
   let rec aux = function 
     | []   -> raise Not_found
     | m::q ->

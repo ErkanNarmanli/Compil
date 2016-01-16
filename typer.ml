@@ -640,12 +640,12 @@ let rec type_expr env tro e = match e.e_cont with
       end in
       let c = classe_lookup env cid in
       (* On va chercher la méthode dans l'environnement de la classe. *)
-      let m = begin try meth_lookup m_id c.cc_env  with
+      let m = begin try meth_lookup c.cc_env m_id with
         (* Si la méthode a été typée récemment, elle n'est pas encore
          * dans c.cc_env mais elle est dans env *)
         | Not_found ->
             begin try
-              meth_lookup m_id env
+              meth_lookup env m_id
             with
               | Not_found ->
                   raise (TypeError (e'.e_loc, "L'identifiant "^m_id^
@@ -1184,7 +1184,7 @@ let type_decl (env, tdl) d = match d.decl_cont with
       (* On n'effectue qu'ici les tests liée au mot clef override *)
       if tm'.tm_override then
         let m' = begin try 
-          meth_lookup tm'.tm_name env 
+          meth_lookup env tm'.tm_name 
         with
           | Not_found ->
               raise (TypeError (m.m_loc, "Cette méthode n'hérite d'aucune "^
@@ -1386,7 +1386,7 @@ let type_classe env c =
                     gamma' := {
                       classes = !gamma'.classes;
                       constrs = !gamma'.constrs;
-                      vars    = add_vars @ (!gamma'.vars);
+                      vars    = (!gamma'.vars) @ add_vars;
                       meths   = add_meths @ (!gamma'.meths);
                       }
                 (* Si on essaie d'hériter d'autre chose que d'une classe, on
@@ -1423,7 +1423,12 @@ let type_classe env c =
   let newtyps = 
     List.map (fun tptc -> Tclasse (get_tptc_id tptc, subst0 ())) tptcs in
   let s = subst_from_lists (List.map tpt_of_tptc tptcs) newtyps in
-  gamma' := add_var_env !gamma' (CVal ("this", Tclasse (c.c_name, s)));
+  gamma' := begin match c.deriv with
+    | None ->
+        add_var_env !gamma' (CVal ("this", Tclasse (c.c_name, s)))
+    | Some _ ->
+        update_var_env (CVal ("this", Tclasse (c.c_name, s))) !gamma'
+  end;
   (* 4. On vérifie que l'appel au constructeur de la super classe est légal.*)
   begin match c.deriv with
     (* Pas de test si pas d'héritage. *)
@@ -1434,9 +1439,7 @@ let type_classe env c =
                     e_loc  = t.t_loc  
                   } in ()
   end;
-  (* 5. On type la liste des déclarations.
-   * On fait un pli avec la fonction type_decl définie plus haut sur la liste
-   * des déclarations *) 
+  (* 5. On type la liste des déclarations. *) 
   let new_env, tdecls' = List.fold_left type_decl (!gamma', []) c.decls in
   gamma' := new_env;
   let tc = {

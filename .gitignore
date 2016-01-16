@@ -13,6 +13,7 @@
 *parser.mli
 tests/exec_add
 tests/exec/*.s
+do_lol.sh
 
 # Binaries
 pscala

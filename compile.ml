@@ -7,6 +7,7 @@ open Context
 module Smap = Map.Make(String)
 
 let (cfields : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17
+let (cmeths : ((ident * ident), string) Hashtbl.t) = Hashtbl.create 17 
 
 let rec popn = function
   | 0 -> nop
@@ -73,8 +74,8 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         (* Instanciation de l'objet de la classe String. *)
         movq (imm 16) (reg rdi) ++
         call "malloc" ++
-        movq (ilab "D_String") (reg rdx) ++ movq (reg rdx) (ind rax) ++
-        movq (ilab strid) (reg rdx) ++ movq (reg rdx) (ind ~ofs:8 rax) ++
+        movq (ilab "D_String") (ind rax) ++
+        movq (ilab strid) (ind ~ofs:8 rax) ++
         (* On place le résultat dans %rdi. *)
         movq (reg rax) (reg rdi) in
       text, data
@@ -87,18 +88,22 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         | TAident i ->
             (* On va chercher la position de la variable locale i sur la pile et
              * on place sa valeur dans %rdi. *)
-            let ofs = begin try
-              Smap.find i env
+            let text = begin try
+              let ofs = Smap.find i env in
+              movq (ind ~ofs:ofs rbp) (reg rdi)
             with
               | Not_found ->
                   begin try
-                    Hashtbl.find cfields (cid, i)
+                    let ofs = Hashtbl.find cfields (cid, i) in
+                    let this = Smap.find "this" env in
+                    movq (ind ~ofs:this rbp) (reg rsi) ++
+                    movq (ind ~ofs:ofs rsi) (reg rdi)
                   with
                     | Not_found ->
                         failwith (cid^"."^i^" inconnu.");
                   end
             end in
-            movq (ind ~ofs:ofs rbp) (reg rdi), nop
+            text, nop
         | TAexpr_ident (e, i) ->
             (* On compile l'objet de l'expression e puis on va chercher la
              * valeur de son champ i. *)
@@ -116,13 +121,17 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
     let et, ed = compile_expr env cid stack_size e in
     begin match a.ta_cont with
         | TAident i ->
-            let ofs = begin try 
-              Smap.find i env
+            let text = begin try 
+              let ofs = Smap.find i env in
+              et ++ movq (reg rdi) (ind ~ofs:ofs rbp)
             with
               | Not_found ->
-                  Hashtbl.find cfields (cid, i)
+                  let this = Smap.find "this" env in
+                  let ofs = Hashtbl.find cfields (cid, i) in
+                  et ++ movq (ind ~ofs:this rbp) (reg rsi) ++ 
+                  movq (reg rdi) (ind ~ofs:ofs rsi)
             end in
-            et ++ movq (reg rdi) (ind ~ofs:ofs rbp), ed
+            text ++ xorq (reg rdi) (reg rdi), ed
         | TAexpr_ident (e, i) ->
             let text, data = compile_expr env cid (stack_size+8) e in
             let cname = begin match e.te_typ with
@@ -137,7 +146,7 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
     end
   | TEacc_typ_exp (e, m, _, es) ->
       (* On compile l'expression qui appelle la méthode et on la met
-      * sur la pile. *)
+      * sur la pile (c'est le this dans la méthode). *)
       let text, data = compile_expr env cid stack_size e in
       let text = text ++ pushq (reg rdi) in 
       (* On empile ensuite les arguments de la méthode. *)
@@ -150,25 +159,39 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         | Tclasse (cid, _) -> cid
         | _ -> failwith "WTF"
       end in 
-      let text = text ++ call ("M_"^cname^"_"^m) in
+      let mname = begin try
+        Hashtbl.find cmeths (cname, m) 
+      with
+        | Not_found ->
+            failwith ("La méthode "^m^" de "^cname^" est inconnue.")
+      end in
+      let text = text ++ call mname in
       (* On dépile les arguments et on place le résulat dans %rdi. *)
       let text = text ++ movq (reg rax) (reg rdi) ++ (popn tot) in
       text, data
   | TEnew (i, _, es) ->
-      (* On place this sur la pile. *)
-      let ofs = Smap.find "this" env in
-      let text = 
-        movq (ind ~ofs:ofs rbp) (reg rdi) ++ pushq (reg rdi) in
-      (* On compile les arguments du constructeur. *)
+      (* On alloue la place nécessaire sur le tas. *)
+      let len = ref 1 in
+      Hashtbl.iter (fun (cid, _) _ -> if cid = i then incr len) cfields;
+      let text =
+        movq (imm (8*(!len))) (reg rdi) ++
+        call "malloc" ++ movq (reg rax) (reg rbx) in
+      (* Étiquette du descripteur du classe. *)
+      let text = text ++ movq (ilab ("D_"^i)) (ind rbx) in
+      (* On compile les arguments du constructeur et on place leurs valeurs sur
+       * le tas. *)
       let comp_arg (text, data, i) e =
-        let t, d = compile_expr env cid (stack_size+i*8) e in
-        text ++ t ++ pushq (reg rdi), data ++ d, i+1 in
-      let text, data, tot =
+        let t, d = compile_expr env cid stack_size e in
+        let text = text ++
+          t ++ movq (reg rdi) (ind ~ofs:(8*i) rbx) in
+        text, data ++ d, i+1 in
+      let text, data, _ =
         List.fold_left comp_arg (text, nop, 1) es in
       (* On appelle le constructeur. *)
-      let text = text ++ call ("M_"^i^"_new") in
-      (* On dépile les arguments et le this. *)
-      text ++ (popn tot) ++ movq (reg rax) (reg rdi), data
+      let text = text ++
+        movq (reg rbx) (reg rdi) ++ call ("M_"^i^"_new") in
+      (* On place l'adresse de l'objet dans %rdi. *)
+      text ++ movq (reg rax) (reg rdi), data
   | TEneg e ->
       (* Négation d'un booléen. *)
       let text, data = compile_expr env cid stack_size e in
@@ -274,15 +297,17 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         popq rbp in 
       text ++ ret, data
   | TEprint e ->
-      let code, data = compile_expr env cid stack_size e in
-      code ++ begin match e.te_typ with
+      let text, data = compile_expr env cid stack_size e in
+      let text = text ++
+      begin match e.te_typ with
         | Tint -> call "print_int"
         | Tstring ->
             movq (ind ~ofs:8 rdi) (reg rdi) ++ 
             xorq (reg rax) (reg rax) ++
             call "printf"
         | _ -> failwith "Le typeur aurait dû refuser ce programme."
-      end, data
+      end in
+      text ++ xorq (reg rdi) (reg rdi) , data
   | TEbloc b ->
       let text, data, _, new_stack  =
         List.fold_left (compile_instr cid) (nop, nop, env, stack_size) b in
@@ -310,15 +335,17 @@ let compile_meth cid (text, data) = function
   | TDmeth m ->
       (* L'étiquette de la méthode. *)
       let text = text ++ label ("M_"^cid^"_"^m.tm_name) in
-      (* On sauvegarde %rbp *)
-      let text = text ++ pushq (reg rbp) ++ movq (reg rsp) (reg rbp) in
+      (* On sauvegarde %rbp et %rbx. *)
+      let text = text ++
+        pushq (reg rbp) ++ movq (reg rsp) (reg rbp) ++
+        pushq (reg rbx) in
       (* Construction de l'environnement pour les variables sur la pile. *)
       let len = List.length m.tm_params in
       let env, _ = List.fold_left (fun (env, i) p ->
         Smap.add p.tp_name (8*(len-i+1)) env, i+1
         ) (Smap.singleton "this" (8*(len+2)), 0) m.tm_params in
       (* Compilation du corps de la méthode. *)
-      let et, ed = compile_expr env cid 0 m.tm_res_expr in
+      let et, ed = compile_expr env cid 8 m.tm_res_expr in
       let text, data = text ++ et ++ movq (reg rdi) (reg rax), data ++ ed in
       (* On restore %rbp et %rsp. *)
       let text = text ++
@@ -332,21 +359,34 @@ let rec get_meth_owner env m c =
   else match c.cc_deriv with
     | None -> c.cc_name
     | Some (Tclasse (cid, _), _) ->
-        let c' = begin try 
-            classe_lookup env cid
+        let c'= begin try 
+          classe_lookup env cid
         with
           | Not_found -> failwith
-          "Echec de la recherche de la classe parente."
+              "Echec de la recherche de la classe parente."
         end in
-        get_meth_owner env m c'
+        begin try
+          let m' = meth_lookup c'.cc_env m.tm_name in
+          get_meth_owner c'.cc_env m' c'
+        with
+          | Not_found -> c.cc_name
+        end
     | Some _ ->
         failwith "Pas possible."
 
 let main_code =
-  glabel "main" ++
-  movq (reg rsp) (reg rbp) ++
+  let len = ref 1 in
+  Hashtbl.iter (fun (cid, _) _ -> if cid = "Main" then incr len) cfields;
+  (* label 'main' *)
+  glabel "main" ++ movq (reg rsp) (reg rbp) ++
+  (* On alloue de la mémoire sur le tas. *)
+  movq (imm (8*(!len))) (reg rdi) ++
+  call "malloc" ++ movq (reg rax) (reg rdi) ++
+  (* On met l'étiquette du descripteur de classe. *)
+  movq (ilab "D_Main") (ind rdi) ++
+  (* On appelle le constructeur de Main. *)
   call "M_Main_new" ++
-  (* Appel de la méthode main. *)
+  (* On appelle la méthode main. *)
   pushq (reg rax) ++ pushq (imm 0) ++
   call "M_Main_main" ++
   popq rdi ++ popq rdi ++
@@ -372,43 +412,38 @@ let print_int_code =
 let make_constr c =
   (* L'étiquette de la méthode. *)
   let text = label ("M_"^c.tc_name^"_new") in
-  (* On sauvegarde %rbp. *)
-  let text = text ++ pushq (reg rbp) ++ movq (reg rsp) (reg rbp) in
-  (* On alloue la place sur le tas. *)
+  (* On sauvegarde %rbp et %rbx.
+   * On place l'adresse de l'objet dans %r8 ainsi que sur
+   * la pile. *)
   let text = text ++
-    movq (imm (8*(List.length c.tc_env.vars))) (reg rdi) ++
-    call "malloc" ++ movq (reg rax) (reg rbx) in
-  (* On remplit les champs de l'objet. *)
-  let len = List.length c.tparams in
-  let text = text ++ 
-    (* this. *)
-    pushq (reg rbx) ++ 
-    (* Étiquette du descripteur du classe. *)
-    movq (ilab ("D_"^c.tc_name)) (reg rdx) ++ movq (reg rdx) (ind rbx)  in
-  let text, env, _ = List.fold_left (fun (t, env, i) p ->
-    (* Arguments du constructeur. *)
-    let ofs = Hashtbl.find cfields (c.tc_name, p.tp_name) in
-    t ++ movq (ind ~ofs:(8*(len-i+1)) rbp) (reg rdi) ++
-    movq (reg rdi) (ind ~ofs:ofs rbx),
-    Smap.add p.tp_name (8*(len-i+1)) env,
-    i+1
-    ) (text, Smap.singleton "this" (-8), 0) c.tparams in
-    (* Variables du corps de la classe. *)
+    pushq (reg rbp) ++ movq (reg rsp) (reg rbp) ++
+    pushq (reg rbx) ++
+    movq (reg rdi) (reg rbx) ++ pushq (reg rbx) in
+  (* On appelle le constructeur de la superclasse. *)
+  let text = match c.tderiv with
+    | None -> text
+    | Some (Tclasse (cid, _), _) ->
+        text ++ call ("M_"^cid^"_new")
+    | _ ->
+        failwith "WTF"
+  in
+  (* Variables du corps de la classe. *)
   let text, data = List.fold_left (fun (t, d) decl -> match decl with 
       | TDvar v ->
           let i, e = begin match v.tv_cont with
             | TVar (i, _, e) -> i, e
             | TVal (i, _, e) -> i, e
           end in
-          let vt, vd = compile_expr env c.tc_name 8 e in
+          let vt, vd = compile_expr (Smap.singleton "this" (-8)) c.tc_name 16 e in
           let ofs = Hashtbl.find cfields (c.tc_name, i) in
           let text = t ++ vt ++ movq (reg rdi) (ind ~ofs:ofs rbx) in
           text, d ++ vd
       | TDmeth _  -> (t, d)
     ) (text, nop) c.tdecls in
-  (* On place this dans %rax et on restore %rbp et %rsp. *)
+  (* On restore %rbp et %rsp, on place l'adresse de l'objet dans %rax. *)
   let text = text ++
     movq (reg rbx) (reg rax) ++
+    movq (ind ~ofs:(-8) rbp) (reg rbx) ++
     movq (reg rbp) (reg rsp) ++
     popq rbp in 
   text ++ ret, data
@@ -416,11 +451,14 @@ let make_constr c =
 
 let compile_class (t, d) c =
   (* Ajout des positions des champs de la classe dans la table. *)
+  Printf.printf "class %s {" c.tc_name;
   let pos = ref 0 in
   List.iter (fun v ->
       incr pos;
+      Printf.printf "v %s ; " (get_cv_id v); 
       Hashtbl.add cfields (c.tc_name, get_cv_id v) (8 * (!pos))
-      ) c.tc_env.vars; 
+      ) (List.rev c.tc_env.vars); 
+  print_endline "}";
   (* Nom de la classe et de la classe mère. *)
   let head = begin
     label ("D_"^c.tc_name) ++
@@ -442,7 +480,9 @@ let compile_class (t, d) c =
               failwith "Echec de l'étiquetage d'une méthode."
         end in
         let cname = get_meth_owner c.tc_env m c' in
-        ms ++ address ["M_"^cname^"_"^m.tm_name]
+        let mname = "M_"^cname^"_"^m.tm_name in
+        Hashtbl.add cmeths (c.tc_name, m.tm_name) mname;
+        ms ++ address [mname]
         ) nop c.tc_env.meths in
   (* Compilation du corps de la classe. *)
   let new_t, new_d = make_constr c in
@@ -474,7 +514,7 @@ let compile_fichier f ofile =
       print_int_code;
     data = data ++
       builtin_classes ++ 
-      label ".Sprint_int" ++ string "%d\n";
+      label ".Sprint_int" ++ string "%d";
   } in
   print_in_file ~file:ofile prog
 
