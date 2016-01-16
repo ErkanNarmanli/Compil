@@ -140,8 +140,6 @@ echo "Partie 3"
 echo "Execution normale"
 echo "-----------------"
 
-timeout="why3-cpulimit 30 0 -h"
-
 for f in tests/exec/*.scala; do
     echo -n "."
     asm=tests/exec/`basename $f .scala`.s
