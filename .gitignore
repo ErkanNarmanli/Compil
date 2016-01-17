@@ -11,8 +11,9 @@
 *lexer.ml
 *parser.ml
 *parser.mli
-tests/exec_add
 tests/exec/*.s
+tests/exec-fail/*.s
+tests/exec_add/good/*.s
 do_lol.sh
 
 # Binaries
