@@ -272,7 +272,7 @@ let glabel (s: label) = S ("\t.globl\t" ^ s ^ "\n" ^ s ^ ":\n")
 
 let comment s = S ("#" ^ s ^ "\n")
 
-let align n = ins ".align %i" n
+(*let align n = ins ".align %i" n*)
 
 let dbyte l = ins ".byte %a" pr_ilist l
 let dint  l = ins ".int %a" pr_ilist l
