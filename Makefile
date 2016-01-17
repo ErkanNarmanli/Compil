@@ -33,7 +33,13 @@ clean:
 
 include .depend
 
-test: make
+test: test1 test2 test3
+
+test1: make
+	./test -1 "./$(BIN) --parse-only"
+test2: make
+	./test -2 "./$(BIN) --type-only"
+test3: make
 	./test -3 ./$(BIN)
 
 stats: make
