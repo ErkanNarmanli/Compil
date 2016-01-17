@@ -39,7 +39,7 @@ echo -n "mauvais "
 for f in tests/syntax/bad/*.scala; do
     echo -n ".";
     max=`expr $max + 1`;
-    compile -parse-only $f;
+    compile $f;
     case $? in
 	"0")
 	echo
@@ -57,7 +57,7 @@ echo -n "bons "
 for f in tests/syntax/good/*.scala tests/typing/bad/*.scala tests/typing/good/*.scala tests/exec/*.scala tests/exec-fail/*.scala; do
     echo -n ".";
     max=`expr $max + 1`;
-    compile -parse-only $f;
+    compile $f;
     case $? in
 	"1")
 	echo
