@@ -114,11 +114,6 @@ let get_cv_id = function
   | CVar (i, _) -> i
   | CVal (i, _) -> i
 
-(* tvar -> texpr *)
-let get_tv_expr tv = match tv.tv_cont with
-  | TVar (_, _, e) -> e
-  | TVal (_, _, e) -> e
-
 (* tparam_type -> ident *)
 let get_tpt_id tpt = fst tpt.tpt_cont
 
