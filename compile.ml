@@ -9,6 +9,9 @@ module Smap = Map.Make(String)
 let (cfields : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17
 let (cmeths : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17 
 let (mlabs : ((ident * ident), string) Hashtbl.t) = Hashtbl.create 17
+let (constr_ss : ((ident * unit), int) Hashtbl.t) = Hashtbl.create 17
+
+let cur_class_env = ref (env0 ())
 
 let rec popn = function
   | 0 -> nop
@@ -52,6 +55,44 @@ let new_meth_id =
 let lazyop = function
   | And | Or -> true
   | _ -> false
+
+let rec get_meth_owner env m c =
+  if m.tm_override then
+    c.cc_name
+  else match c.cc_deriv with
+    | None -> c.cc_name
+    | Some (Tclasse (cid, _), _) ->
+        let c'= begin try 
+          classe_lookup env cid
+        with
+          | Not_found -> failwith
+              "Echec de la recherche de la classe parente."
+        end in
+        begin try
+          let m' = meth_lookup c'.cc_env m.tm_name in
+          get_meth_owner c'.cc_env m' c'
+        with
+          | Not_found -> c.cc_name
+        end
+    | Some _ ->
+        failwith "Pas possible."
+
+let rec get_mofs cname mid = 
+  try
+    Hashtbl.find cmeths (cname, mid)
+  with
+  | Not_found ->
+      let c = begin try
+        classe_lookup !cur_class_env cname
+      with
+      | Not_found -> failwith "tiens donc."
+      end in
+      begin match c.cc_deriv with
+      | None -> raise Not_found
+      | Some (Tclasse (cid, _), _) ->
+          get_mofs cid mid
+      | _ -> failwith "Le typeur est fou."
+      end
 
 (* Produit le code compilant une expression. Le résulat est placé dans %rdi.
  * texpr -> text * data * int *)
@@ -169,7 +210,7 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         | _ -> failwith "WTF"
       end in 
       let mofs = begin try
-        Hashtbl.find cmeths (cname, m) 
+        get_mofs cname m
       with
         | Not_found ->
             failwith ("La méthode "^m^" de "^cname^" est inconnue.")
@@ -181,31 +222,34 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
       (* On dépile les arguments et on place le résulat dans %rdi. *)
       let text = text ++ movq (reg rax) (reg rdi) ++ (popn tot) in
       text, data
-  | TEnew (i, _, es) ->
+  | TEnew (cid', _, es) ->
       (* On alloue la place nécessaire sur le tas. *)
       let len = ref 1 in
-      Hashtbl.iter (fun (cid, _) _ -> if cid = i then incr len) cfields;
+      Hashtbl.iter (fun (cid, _) _ -> if cid = cid' then incr len) cfields;
       let text =
         movq (imm (8*(!len))) (reg rdi) ++
         call "malloc" in
       (* Étiquette du descripteur du classe. *)
-      let text = text ++ movq (ilab ("D_"^i)) (ind rax) in
+      let text = text ++ movq (ilab ("D_"^cid')) (ind rax) in
       (* On sauvegarde le pointeur vers l'objet sur la pile. *)
       let text = text ++ pushq (reg rax) in
       (* On compile les arguments du constructeur et on place leurs valeurs sur
        * le tas. *)
+      let c = classe_lookup !cur_class_env cid' in
       let comp_arg (text, data, i) e =
+        let arg = (List.nth c.cc_params i).tp_name in
+        let ofs = Hashtbl.find cfields (cid', arg) in
         let t, d = compile_expr env cid (stack_size+8) e in
         let text = text ++ t ++
           movq (ind ~ofs:(-stack_size-8) rbp) (reg rbx) ++
-          movq (reg rdi) (ind ~ofs:(8*i) rbx) in
+          movq (reg rdi) (ind ~ofs:ofs rbx) in
         text, data ++ d, i+1 in
       let text, data, _ =
-        List.fold_left comp_arg (text, nop, 1) es in
+        List.fold_left comp_arg (text, nop, 0) es in
       (* On appelle le constructeur. *)
       let text = text ++
         popq rbx ++
-        movq (reg rbx) (reg rdi) ++ call ("M_"^i^"_new") in
+        movq (reg rbx) (reg rdi) ++ call ("M_"^cid'^"_new") in
       (* On place l'adresse de l'objet dans %rdi. *)
       text ++ movq (reg rax) (reg rdi), data
   | TEneg e ->
@@ -373,27 +417,6 @@ let compile_meth cid (text, data) = function
         popq rbp in
       text ++ ret, data
 
-let rec get_meth_owner env m c =
-  if m.tm_override then
-    c.cc_name
-  else match c.cc_deriv with
-    | None -> c.cc_name
-    | Some (Tclasse (cid, _), _) ->
-        let c'= begin try 
-          classe_lookup env cid
-        with
-          | Not_found -> failwith
-              "Echec de la recherche de la classe parente."
-        end in
-        begin try
-          let m' = meth_lookup c'.cc_env m.tm_name in
-          get_meth_owner c'.cc_env m' c'
-        with
-          | Not_found -> c.cc_name
-        end
-    | Some _ ->
-        failwith "Pas possible."
-
 let main_code () =
   let len = ref 1 in
   Hashtbl.iter (fun (cid, _) _ -> if cid = "Main" then incr len) cfields;
@@ -430,6 +453,17 @@ let print_int_code =
   call "printf" ++
   ret
 
+let rec extends_nb_aux c = match c.cc_deriv with
+  | None -> 1
+  | Some (Tclasse (cid, _), _) ->
+      let c = classe_lookup c.cc_env cid in
+      1 + extends_nb_aux c
+  | Some _ -> failwith "Non mais sérieux."
+
+let extends_nb c =
+  let c = classe_lookup c.tc_env c.tc_name in
+  extends_nb_aux c
+
 let make_constr c =
   (* L'étiquette de la méthode. *)
   let text = label ("M_"^c.tc_name^"_new") in
@@ -443,17 +477,37 @@ let make_constr c =
     text ++ movq (reg rdi) (reg rax) ++ ret, nop
   else begin
     (* On sauvegarde %rbp et %rbx.
-    * On place l'adresse de l'objet dans %rbx ainsi que sur
-    * la pile. *)
+    * On place l'adresse de l'objet sur la pile. *)
     let text = text ++
       pushq (reg rbp) ++ movq (reg rsp) (reg rbp) ++
       pushq (reg rbx) ++
       pushq (reg rdi) in
     (* On appelle le constructeur de la superclasse. *)
-    let text = match c.tderiv with
-      | None -> text
-      | Some (Tclasse (cid, _), _) ->
-          text ++ call ("M_"^cid^"_new")
+    let text, data = match c.tderiv with
+      | None -> text, nop
+      | Some (Tclasse (cid, _), es) ->
+          (* À expliquer peut-être un jour dans un futur lointain. *)
+          let stack_size = 8*(extends_nb c) in
+          (* On cherche la classe mère. *)
+          let c' = classe_lookup c.tc_env cid in
+          (* Un fonction qui compile les arguments du constructeur de la
+           * superclasse et ls ajoute à leur place sur le tas. *)
+          let comp_arg (text, data, i) e =
+            let arg = (List.nth c'.cc_params i).tp_name in
+            let ofs = Hashtbl.find cfields (cid, arg) in 
+            let t, d = compile_expr (Smap.singleton "this" (-stack_size))
+              c.tc_name stack_size e in
+            let text = text ++ t ++
+              (* Le this. *)
+              movq (ind ~ofs:(-16) rbp) (reg rbx) ++
+              movq (reg rdi) (ind ~ofs:ofs rbx) in
+            text, data ++ d, i+1 in
+          let text, data, _ =
+            List.fold_left comp_arg (text, nop, 0) es in
+          let text = text ++
+            movq (ind ~ofs:(-16) rbp) (reg rdi) ++
+            call ("M_"^cid^"_new") in
+          text, data
       | _ ->
           failwith "WTF"
     in
@@ -465,14 +519,14 @@ let make_constr c =
               | TVal (i, _, e) -> i, e
             end in
             let vt, vd =
-              compile_expr (Smap.singleton "this" (-8)) c.tc_name 16 e in
+              compile_expr (Smap.singleton "this" (-16)) c.tc_name 16 e in
             let ofs = Hashtbl.find cfields (c.tc_name, i) in
             let text = t ++ vt ++
               movq (ind ~ofs:(-16) rbp) (reg rbx) ++
               movq (reg rdi) (ind ~ofs:ofs rbx) in
             text, d ++ vd
         | TDmeth _  -> (t, d)
-      ) c.tdecls (text, nop) in
+      ) c.tdecls (text, data) in
     (* On restore %rbp et %rsp, on place l'adresse de l'objet dans %rax. *)
     let text = text ++
       movq (reg rbx) (reg rax) ++
@@ -483,13 +537,17 @@ let make_constr c =
   end
 
 let compile_class (t, d) c =
+  (* On met tout de suite l'environnement local de la classe dans cur_class_env.
+   *)
+  cur_class_env := c.tc_env;
   (* Ajout des positions des champs de la classe dans la table. *)
   let pos = ref 0 in
   List.iter (fun v ->
     let vid = get_cv_id v in
     if not (vid = "this") then begin
       incr pos;
-      Hashtbl.add cfields (c.tc_name, get_cv_id v) (8 * (!pos))
+      Printf.printf "Ajout de %s.%s -> %d\n" c.tc_name vid (8*(!pos));
+      Hashtbl.add cfields (c.tc_name, vid) (8 * (!pos))
     end) (List.rev c.tc_env.vars); 
   (* Nom de la classe et de la classe mère. *)
   let head = begin
@@ -512,11 +570,9 @@ let compile_class (t, d) c =
               failwith "Echec de l'étiquetage d'une méthode."
         end in
         let cname = get_meth_owner c.tc_env m c' in
-        print_endline cname;
         let mname = if cname = c.tc_name then begin
           let id = new_meth_id () in
           Hashtbl.add mlabs (c.tc_name, m.tm_name) id;
-          print_endline id;
           id
         end else begin
           try

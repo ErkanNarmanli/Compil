@@ -1363,10 +1363,10 @@ let type_classe env c =
   gamma' := add_classe_env !gamma' tc0;
   (* 2. On vérifie que le type dont on hérite est bien formé et on l'ajoute à
    * l'environnement. *)
-  let (tps, td) = begin match c.deriv with
+  let (tps, tau_o) = begin match c.deriv with
     | None ->
         (List.map (tparam_of_param !gamma') (get_list c.params), None)
-    | Some (t, es_o) ->
+    | Some (t, _) ->
         let tau = typerType_of_typ !gamma' t in
         begin match is_bf !gamma' t.t_loc tau with
           | None ->
@@ -1405,7 +1405,7 @@ let type_classe env c =
         end;
         (
           List.map (tparam_of_param !gamma') (get_list c.params),
-          Some (tau, List.map (type_expr !gamma' None) (get_list es_o))
+          Some tau
         )
   end in
   (* la classe C avec seulement les champs hérités *)
@@ -1413,7 +1413,7 @@ let type_classe env c =
     cc_name   = c.c_name;
     cc_tptcs  = tptcs;
     cc_params = tps;
-    cc_deriv  = td;
+    cc_deriv  = opt_map (fun tau -> (tau, [])) tau_o;
     cc_env = !gamma'
   } in 
   (* On ajoute ce C provisoire à gamma et gamma' aussi. *)
@@ -1433,15 +1433,16 @@ let type_classe env c =
         update_var_env (CVal ("this", Tclasse (c.c_name, s))) !gamma'
   end;
   (* 4. On vérifie que l'appel au constructeur de la super classe est légal.*)
-  begin match c.deriv with
+  let td = begin match c.deriv with
     (* Pas de test si pas d'héritage. *)
-    | None            -> ()
+    | None            -> None
     | Some (t, es_o)  ->
-        let _ = type_expr !gamma' None
-                  { e_cont = Enew(t.t_name, t.args_type, get_list es_o);
-                    e_loc  = t.t_loc  
-                  } in ()
-  end;
+        ignore (type_expr !gamma' None { 
+          e_cont = Enew(t.t_name, t.args_type, get_list es_o);
+          e_loc  = t.t_loc  
+        });
+        Some(get_opt tau_o, List.map (type_expr !gamma' None) (get_list es_o))
+  end in
   (* 5. On type la liste des déclarations. *) 
   let new_env, tdecls' = List.fold_left type_decl (!gamma', []) c.decls in
   gamma' := new_env;

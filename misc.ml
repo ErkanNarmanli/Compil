@@ -56,6 +56,17 @@ let is_none = function
   | None -> true
   | Some _ -> false
 
+(* ('a -> 'b) -> 'a option -> 'b option *)
+let opt_map f = function
+  | None -> None
+  | Some x -> Some (f x)
+
+(* 'a option -> 'a *)
+let get_opt = function
+  | None -> raise Not_found
+  | Some x -> x
+
+
 (* Rend la position d'une liste de param_typ_classe
  * param_type_classe -> loc *)
 let make_ptcs_loc ptcs = 
