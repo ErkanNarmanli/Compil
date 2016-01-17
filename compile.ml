@@ -8,6 +8,7 @@ module Smap = Map.Make(String)
 
 let (cfields : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17
 let (cmeths : ((ident * ident), int) Hashtbl.t) = Hashtbl.create 17 
+let (mlabs : ((ident * ident), string) Hashtbl.t) = Hashtbl.create 17
 
 let rec popn = function
   | 0 -> nop
@@ -40,6 +41,13 @@ let new_if_id =
     incr i;
     let i = string_of_int !i in
     "else_"^i, "end_if_"^i)
+
+let new_meth_id = 
+  let i = ref (-1) in
+  (fun () ->
+    incr i;
+    let i = string_of_int !i in
+    "M_"^i) 
 
 let lazyop = function
   | And | Or -> true
@@ -217,12 +225,12 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         | Mul -> imulq (reg rsi) (reg rdi)
         | Div ->
             movq (reg rdi) (reg rax) ++
-            xorq (reg rdx) (reg rdx) ++
+            cqto ++
             idivq (reg rsi) ++
             movq (reg rax) (reg rdi)
         | Mod ->
             movq (reg rdi) (reg rax) ++
-            xorq (reg rdx) (reg rdx) ++
+            cqto ++
             idivq (reg rsi) ++
             movq (reg rdx) (reg rdi)
         | Eq | EqRef ->
@@ -345,7 +353,7 @@ let compile_meth cid (text, data) = function
   | TDvar _ -> (text, data)
   | TDmeth m ->
       (* L'étiquette de la méthode. *)
-      let text = text ++ label ("M_"^cid^"_"^m.tm_name) in
+      let text = text ++ label (Hashtbl.find mlabs (cid, m.tm_name)) in
       (* On sauvegarde %rbp et %rbx. *)
       let text = text ++
         pushq (reg rbp) ++ movq (reg rsp) (reg rbp) ++
@@ -386,7 +394,7 @@ let rec get_meth_owner env m c =
     | Some _ ->
         failwith "Pas possible."
 
-let main_code =
+let main_code () =
   let len = ref 1 in
   Hashtbl.iter (fun (cid, _) _ -> if cid = "Main" then incr len) cfields;
   (* label 'main' *)
@@ -400,7 +408,8 @@ let main_code =
   call "M_Main_new" ++
   (* On appelle la méthode main. *)
   pushq (reg rax) ++ pushq (imm 0) ++
-  call "M_Main_main" ++
+  call (begin try Hashtbl.find mlabs ("Main", "main") with | Not_found ->
+    failwith "Lolilol" end) ++
   popq rdi ++ popq rdi ++
   xorq (reg rax) (reg rax) ++
   ret
@@ -458,7 +467,6 @@ let make_constr c =
             let vt, vd =
               compile_expr (Smap.singleton "this" (-8)) c.tc_name 16 e in
             let ofs = Hashtbl.find cfields (c.tc_name, i) in
-            Printf.printf "Init %s.%s\n" c.tc_name i;
             let text = t ++ vt ++
               movq (ind ~ofs:(-16) rbp) (reg rbx) ++
               movq (reg rdi) (ind ~ofs:ofs rbx) in
@@ -481,7 +489,6 @@ let compile_class (t, d) c =
     let vid = get_cv_id v in
     if not (vid = "this") then begin
       incr pos;
-      Printf.printf "%s.%s -> %d\n" c.tc_name (get_cv_id v) (8*(!pos));
       Hashtbl.add cfields (c.tc_name, get_cv_id v) (8 * (!pos))
     end) (List.rev c.tc_env.vars); 
   (* Nom de la classe et de la classe mère. *)
@@ -505,7 +512,19 @@ let compile_class (t, d) c =
               failwith "Echec de l'étiquetage d'une méthode."
         end in
         let cname = get_meth_owner c.tc_env m c' in
-        let mname = "M_"^cname^"_"^m.tm_name in
+        print_endline cname;
+        let mname = if cname = c.tc_name then begin
+          let id = new_meth_id () in
+          Hashtbl.add mlabs (c.tc_name, m.tm_name) id;
+          print_endline id;
+          id
+        end else begin
+          try
+            Hashtbl.find mlabs (cname, m.tm_name)
+          with
+            | Not_found ->
+                failwith "Euh... Dafuk ?"
+        end in
         Hashtbl.add cmeths (c.tc_name, m.tm_name) i;
         ms ++ address [mname], i+8
         ) c.tc_env.meths (nop, 8) in
@@ -533,7 +552,7 @@ let compile_fichier f ofile =
   let prog = {
     text = 
       (* main *)
-      main_code ++
+      main_code () ++
       (* Le reste du code *)
       text ++
       print_int_code;

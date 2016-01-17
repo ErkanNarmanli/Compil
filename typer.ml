@@ -1344,7 +1344,7 @@ let type_classe env c =
   if not (list_uniq (fun p -> p.p_name) (get_list c.params)) then
     raise (TypeError (c.c_loc, "Les paramètres du constructeur de cette "^
     "classe ne sont pas distincts deux à deux."));
-  (* On declare des environnements mutables pour ne pas se perde *)
+  (* On declare des environnements mutables pour éviter se perdre *)
   let gamma  = ref env in
   let gamma' = ref env in
   (* 1. On checke les paramètres de type et on les ajoute à l'env *)
