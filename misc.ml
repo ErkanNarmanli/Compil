@@ -51,6 +51,11 @@ let get_list = function
   | None -> []
   | Some l -> l
 
+(* 'a option -> bool *)
+let is_none = function
+  | None -> true
+  | Some _ -> false
+
 (* Rend la position d'une liste de param_typ_classe
  * param_type_classe -> loc *)
 let make_ptcs_loc ptcs = 

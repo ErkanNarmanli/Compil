@@ -59,6 +59,7 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
         | Not_found ->
             failwith "Impossible de localiser 'this'."
       end in
+      comment "this" ++
       movq (ind ~ofs:ofs rbp) (reg rdi), nop
   | TEnull ->
       (* On rend 0. *)
@@ -148,8 +149,7 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
       (* On compile l'expression qui appelle la méthode et on la met
       * sur la pile (c'est le this dans la méthode). *)
       let text, data = compile_expr env cid stack_size e in
-      let text = text ++
-        pushq (reg rdi) ++ movq (reg rdi) (reg rbx) in 
+      let text = text ++ pushq (reg rdi) in 
       (* On empile ensuite les arguments de la méthode. *)
       let text, data, tot = List.fold_left (fun (text, data, i) e ->
         let et, ed = compile_expr env cid (stack_size + 8*i) e in
@@ -167,6 +167,7 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
             failwith ("La méthode "^m^" de "^cname^" est inconnue.")
       end in
       let text = text ++
+        movq (ind ~ofs:(-(stack_size+8)) rbp) (reg rbx) ++
         movq (ind rbx) (reg r8) ++
         call_star (ind ~ofs:mofs r8) in
       (* On dépile les arguments et on place le résulat dans %rdi. *)
@@ -178,20 +179,24 @@ let rec compile_expr env cid stack_size e = match e.te_cont with
       Hashtbl.iter (fun (cid, _) _ -> if cid = i then incr len) cfields;
       let text =
         movq (imm (8*(!len))) (reg rdi) ++
-        call "malloc" ++ movq (reg rax) (reg rbx) in
+        call "malloc" in
       (* Étiquette du descripteur du classe. *)
-      let text = text ++ movq (ilab ("D_"^i)) (ind rbx) in
+      let text = text ++ movq (ilab ("D_"^i)) (ind rax) in
+      (* On sauvegarde le pointeur vers l'objet sur la pile. *)
+      let text = text ++ pushq (reg rax) in
       (* On compile les arguments du constructeur et on place leurs valeurs sur
        * le tas. *)
       let comp_arg (text, data, i) e =
-        let t, d = compile_expr env cid stack_size e in
-        let text = text ++
-          t ++ movq (reg rdi) (ind ~ofs:(8*i) rbx) in
+        let t, d = compile_expr env cid (stack_size+8) e in
+        let text = text ++ t ++
+          movq (ind ~ofs:(-stack_size-8) rbp) (reg rbx) ++
+          movq (reg rdi) (ind ~ofs:(8*i) rbx) in
         text, data ++ d, i+1 in
       let text, data, _ =
         List.fold_left comp_arg (text, nop, 1) es in
       (* On appelle le constructeur. *)
       let text = text ++
+        popq rbx ++
         movq (reg rbx) (reg rdi) ++ call ("M_"^i^"_new") in
       (* On place l'adresse de l'objet dans %rdi. *)
       text ++ movq (reg rax) (reg rdi), data
@@ -419,49 +424,66 @@ let print_int_code =
 let make_constr c =
   (* L'étiquette de la méthode. *)
   let text = label ("M_"^c.tc_name^"_new") in
-  (* On sauvegarde %rbp et %rbx.
-   * On place l'adresse de l'objet dans %r8 ainsi que sur
-   * la pile. *)
-  let text = text ++
-    pushq (reg rbp) ++ movq (reg rsp) (reg rbp) ++
-    pushq (reg rbx) ++
-    movq (reg rdi) (reg rbx) ++ pushq (reg rbx) in
-  (* On appelle le constructeur de la superclasse. *)
-  let text = match c.tderiv with
-    | None -> text
-    | Some (Tclasse (cid, _), _) ->
-        text ++ call ("M_"^cid^"_new")
-    | _ ->
-        failwith "WTF"
-  in
-  (* Variables du corps de la classe. *)
-  let text, data = List.fold_left (fun (t, d) decl -> match decl with 
-      | TDvar v ->
-          let i, e = begin match v.tv_cont with
-            | TVar (i, _, e) -> i, e
-            | TVal (i, _, e) -> i, e
-          end in
-          let vt, vd = compile_expr (Smap.singleton "this" (-8)) c.tc_name 16 e in
-          let ofs = Hashtbl.find cfields (c.tc_name, i) in
-          let text = t ++ vt ++ movq (reg rdi) (ind ~ofs:ofs rbx) in
-          text, d ++ vd
-      | TDmeth _  -> (t, d)
-    ) (text, nop) c.tdecls in
-  (* On restore %rbp et %rsp, on place l'adresse de l'objet dans %rax. *)
-  let text = text ++
-    movq (reg rbx) (reg rax) ++
-    movq (ind ~ofs:(-8) rbp) (reg rbx) ++
-    movq (reg rbp) (reg rsp) ++
-    popq rbp in 
-  text ++ ret, data
+  (* Petite optimisation utile pour le debug : quand le constructeur ne fait
+   * rien, il ne fait rien. *)
+  let empty = ref true in 
+  Hashtbl.iter (fun (id, x) _ -> if
+    id = c.tc_name && x <> "this" then empty := false)
+    cfields;
+  if !empty && is_none c.tderiv then
+    text ++ movq (reg rdi) (reg rax) ++ ret, nop
+  else begin
+    (* On sauvegarde %rbp et %rbx.
+    * On place l'adresse de l'objet dans %rbx ainsi que sur
+    * la pile. *)
+    let text = text ++
+      pushq (reg rbp) ++ movq (reg rsp) (reg rbp) ++
+      pushq (reg rbx) ++
+      pushq (reg rdi) in
+    (* On appelle le constructeur de la superclasse. *)
+    let text = match c.tderiv with
+      | None -> text
+      | Some (Tclasse (cid, _), _) ->
+          text ++ call ("M_"^cid^"_new")
+      | _ ->
+          failwith "WTF"
+    in
+    (* Variables du corps de la classe. *)
+    let text, data = List.fold_right (fun decl (t, d) -> match decl with 
+        | TDvar v ->
+            let i, e = begin match v.tv_cont with
+              | TVar (i, _, e) -> i, e
+              | TVal (i, _, e) -> i, e
+            end in
+            let vt, vd =
+              compile_expr (Smap.singleton "this" (-8)) c.tc_name 16 e in
+            let ofs = Hashtbl.find cfields (c.tc_name, i) in
+            Printf.printf "Init %s.%s\n" c.tc_name i;
+            let text = t ++ vt ++
+              movq (ind ~ofs:(-16) rbp) (reg rbx) ++
+              movq (reg rdi) (ind ~ofs:ofs rbx) in
+            text, d ++ vd
+        | TDmeth _  -> (t, d)
+      ) c.tdecls (text, nop) in
+    (* On restore %rbp et %rsp, on place l'adresse de l'objet dans %rax. *)
+    let text = text ++
+      movq (reg rbx) (reg rax) ++
+      movq (ind ~ofs:(-8) rbp) (reg rbx) ++
+      movq (reg rbp) (reg rsp) ++
+      popq rbp in 
+    text ++ ret, data
+  end
 
 let compile_class (t, d) c =
   (* Ajout des positions des champs de la classe dans la table. *)
   let pos = ref 0 in
   List.iter (fun v ->
+    let vid = get_cv_id v in
+    if not (vid = "this") then begin
       incr pos;
+      Printf.printf "%s.%s -> %d\n" c.tc_name (get_cv_id v) (8*(!pos));
       Hashtbl.add cfields (c.tc_name, get_cv_id v) (8 * (!pos))
-      ) (List.rev c.tc_env.vars); 
+    end) (List.rev c.tc_env.vars); 
   (* Nom de la classe et de la classe mère. *)
   let head = begin
     label ("D_"^c.tc_name) ++
@@ -475,7 +497,7 @@ let compile_class (t, d) c =
   end in
   (* Étiquettes des méthodes *)
   let meths, _ = 
-    List.fold_left (fun (ms, i) m ->
+    List.fold_right (fun m (ms, i) ->
         let c' = begin try
           classe_lookup c.tc_env c.tc_name
         with
@@ -486,7 +508,7 @@ let compile_class (t, d) c =
         let mname = "M_"^cname^"_"^m.tm_name in
         Hashtbl.add cmeths (c.tc_name, m.tm_name) i;
         ms ++ address [mname], i+8
-        ) (nop, 8) (List.rev c.tc_env.meths) in
+        ) c.tc_env.meths (nop, 8) in
   (* Compilation du corps de la classe. *)
   let new_t, new_d = make_constr c in
   let meths_t, meths_d =
