@@ -14,7 +14,8 @@
 tests/exec/*.s
 tests/exec-fail/*.s
 tests/exec_add/good/*.s
-do_lol.sh
+a.out
+out
 
 # Binaries
 pscala
