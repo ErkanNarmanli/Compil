@@ -86,7 +86,7 @@ max=0
 
 # les mauvais
 echo -n "mauvais "
-for f in tests/typing/bad/*.scala; do
+for f in tests/typing/bad/*.scala tests/bonus/tobast.scala; do
     echo -n ".";
     max=`expr $max + 1`;
     compile $f;
