@@ -41,6 +41,10 @@ test2: make
 	./test -2 "./$(BIN) --type-only"
 test3: make
 	./test -3 ./$(BIN)
+	rm -f out a.out
+	rm -f tests/exec/*.s
+	rm -f tests/exec-fail/*.s
+	rm -f tests/exec_add/good/*.s
 
 stats: make
 	./stats -w
