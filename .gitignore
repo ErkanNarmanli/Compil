@@ -1,21 +1,10 @@
-*.annot
-*.cmo
-*.cma
-*.cmi
-*.dot
 *.sw[op]
-*.conflicts
-*.automaton
 
-*.depend
-*lexer.ml
-*parser.ml
-*parser.mli
+_build/
+
 tests/exec/*.s
 tests/exec-fail/*.s
 tests/exec_add/good/*.s
-a.out
-out
 
-# Binaries
+# Binary
 pscala

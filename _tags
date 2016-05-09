@@ -1,0 +1,4 @@
+<src>: include
+true: use_menhir
+<src/parser.mly>:     warn(A-4)
+not <src/parser.mly>: warn(A)

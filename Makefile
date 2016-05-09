@@ -1,52 +1,26 @@
-CMO=ppast.cmo lexer.cmo parser.cmo tast.cmo misc.cmo context.cmo substitution.cmo printing.cmo variance.cmo typer.cmo x86_64.cmo compile.cmo main.cmo
-GENERATED=lexer.ml parser.ml parser.mli parser.automaton
 BIN=pscala
-FLAGS=-w +A-4
 
-make: $(CMO)
-	ocamlc $(FLAGS) -o $(BIN) $(CMO)
-
-.SUFFIXES: .mli .ml .cmi .cmo .mll .mly
-
-%.cmi: %.mli
-	ocamlc $(FLAGS) -c $<
-
-%.cmo: %.ml
-	ocamlc $(FLAGS) -c $<
-
-%.ml: %.mll
-	ocamllex $<
-
-%.ml: %.mly
-	menhir --infer -v $<
-
-parser.ml: ast.cmi
+all:
+	ocamlbuild src/$(BIN).native
+	mv $(BIN).native $(BIN)
 
 clean:
-	rm *.cmi *.cmo
-	rm $(BIN)
-	rm $(GENERATED)
-
-.depend depend: $(GENERATED)
-	rm -f .depend
-	ocamldep *.ml *.mli  > .depend
-
-include .depend
+	ocamlbuild -clean
+	rm -f $(BIN)
 
 test: test1 test2 test3
 
-test1: make
+test1: all
 	./test -1 "./$(BIN) --parse-only"
-test2: make
+test2: all
 	./test -2 "./$(BIN) --type-only"
-test3: make
+test3: all
 	./test -3 ./$(BIN)
 	rm -f out a.out
 	rm -f tests/exec/*.s
 	rm -f tests/exec-fail/*.s
 	rm -f tests/exec_add/good/*.s
 
-stats: make
+stats: all
 	./stats -w
-
 
