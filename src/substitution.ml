@@ -20,20 +20,14 @@ let subst_from_lists tpts ts =
  * d'une composition.
  * ident -> typerType -> substitution -> substitution *)
 let rec add_one_key id t m = 
-  let f id' = function 
-    | Tclasse (cid, s) ->
-        if id' = id then
-          if cid = id then
-            t
-          else
-            Tclasse (cid, add_one_key id t s)
-        else
-          if id = cid then
-            t
-          else 
-            Tclasse (cid, add_one_key id t s)
-    | t' -> t'
-  in let m' = Smap.mapi f m in
+  let f id' (cid, s) =
+    if id' = id then
+      if cid = id then t
+      else Tclasse (cid, add_one_key id t s)
+    else
+      if id = cid then t
+      else Tclasse (cid, add_one_key id t s) in
+  let m' = Smap.mapi (fun id' -> map_class (f id')) m in
   if Smap.exists (fun i _ -> i = id) m' then
     m'
   else
@@ -45,15 +39,10 @@ let subst_compose = Smap.fold add_one_key
 
 (* Applique une substitution à un type.
  * substitution -> typerType -> typerType *)
-let subst s = function
-  | Tclasse (cid, s') ->
-      begin try 
-          Smap.find cid s
-      with  
-        | Not_found ->
-            Tclasse (cid, subst_compose s s')
-      end
-  | t -> t 
+let subst s = map_class (function (cid, s') ->
+  try Smap.find cid s
+  with Not_found ->  Tclasse (cid, subst_compose s s')
+  )
 
 (* Idem mais mais applicable à un id.
  * /!\ Doit servir uniquement à substituer un paramètre de type

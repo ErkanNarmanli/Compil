@@ -32,6 +32,29 @@ let rec filter_map f = function
         | Some x  -> x::(filter_map f q)
       end
 
+(* map n'agissant que dans sur les classes :
+ * (ident*substitution -> typerType) -> typerType -> typerType *)
+let map_class f = function
+  | Tclasse (id, subst) -> f (id, subst)
+  | Tany | TanyVal | Tboolean | Tint | Tunit
+         | TanyRef | Tstring | Tnull | Tnothing as t' -> t'
+
+(* map n'agissant que sur les classes avec une valeur par défaut pour les autres
+ * types.
+ * 'a -> (ident*substitution -> 'a) -> typerType -> 'a *) 
+let map_class_def def f = function
+  | Tclasse (id, subst) -> f (id, subst)
+  | Tany | TanyVal | Tboolean | Tint | Tunit
+         | TanyRef | Tstring | Tnull | Tnothing -> def
+
+(* map n'agissant que sur les classes avec une valeur par défaut pour les autres
+ * types.
+ * 'a -> (ident*substitution -> 'a) -> typerType -> 'a *) 
+let map_class_err emsg f = function
+  | Tclasse (id, subst) -> f (id, subst)
+  | Tany | TanyVal | Tboolean | Tint | Tunit
+         | TanyRef | Tstring | Tnull | Tnothing -> failwith emsg
+
 (* Indique si les éléments de la liste après passage par la fonction de
  * transport sont distincts deux à deux.
  * ('a -> string) -> 'a list -> bool *)

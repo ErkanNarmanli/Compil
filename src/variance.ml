@@ -13,9 +13,6 @@ let anti = function
   | Neutre -> Neutre
 
 
-
-
- 
 (* Indique si un type est issu d'un paramètre de type (le cas échéant)
  * covariant, contravariant ou sans variance. Renvoie "sans variance" si le type
  * est un vrai type.
@@ -30,41 +27,41 @@ let anti = function
  *    ((bool * loc) option * tparam_type_classe list) *)
 let rec get_variance' env lo t = match lo with
   | Some tptcs ->
-      begin match t with
-        | Tclasse(i, _) -> 
-            let rec aux = function
-              | [] -> (None, tptcs)
-              | tptc::q -> begin match tptc.tptc_cont with
-                    | TPTCplus tpt ->
-                        if i = fst tpt.tpt_cont then
-                          (Some (true, tpt.tpt_loc), tptcs)
-                        else
-                          aux q
-                    | TPTCmoins tpt ->
-                        if i = fst tpt.tpt_cont then
-                          (Some (false, tpt.tpt_loc), tptcs)
-                        else
-                          aux q
-                    | TPTCrien  tpt ->
-                        if i = fst tpt.tpt_cont then
-                          (None, tptcs)
-                        else
-                          aux q
-              end in aux tptcs
-        | _ -> (None, tptcs)
-      end
+      let default = (None, tptcs) in
+      let class_action (i, _) = 
+        let rec aux = function
+          | [] -> (None, tptcs)
+          | tptc::q -> begin match tptc.tptc_cont with
+                | TPTCplus tpt ->
+                    if i = fst tpt.tpt_cont then
+                      (Some (true, tpt.tpt_loc), tptcs)
+                    else
+                      aux q
+                | TPTCmoins tpt ->
+                    if i = fst tpt.tpt_cont then
+                      (Some (false, tpt.tpt_loc), tptcs)
+                    else
+                      aux q
+                | TPTCrien  tpt ->
+                    if i = fst tpt.tpt_cont then
+                      (None, tptcs)
+                    else
+                      aux q
+              end in
+        aux tptcs in
+      map_class_def default class_action t
   | None ->
+      let class_action (cid, _) = 
+        let c = classe_lookup env cid in
+        get_variance' env (Some c.cc_tptcs) t in
       begin try
-        begin match fst (var_lookup env "this") with
-          | Tclasse(cid, _) ->
-              let c = classe_lookup env cid in
-              get_variance' env (Some c.cc_tptcs) t
-          | _ -> failwith "this ne peut être qu'une instance de classe."
-        end
-      with
-        | Not_found ->
-            failwith ("On ne sait pas dans quelle classe aller chercher les "^
-            "paramètres de type.")
+        map_class_err
+          "this ne peut être qu'une instance de classe."
+          class_action
+          (fst (var_lookup env "this"))
+      with Not_found ->
+        failwith ("On ne sait pas dans quelle classe aller chercher les "^
+        "paramètres de type.")
       end
 
 (* Version abrégée : on connait déjà les paramètres de type.
